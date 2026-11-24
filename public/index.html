@@ -1216,7 +1216,8 @@
                 const pct = Math.min(100, Math.round((prog.solved / Math.max(1, cfg.requiredSolved)) * 100));
                 const doneBadge = prog.passed || lvl < state.currentLevel ? ' • ✅ Đã qua màn' : '';
                 dom.levelProgressLabel.textContent = `Tiến độ ${cfg.shortName}: ${prog.solved}/${cfg.requiredSolved} mã${doneBadge}`;
-                dom.levelProgressMeta.textContent = `Acc ${prog.accuracyPct}% (cần >=${cfg.minAccuracyPct}% • ${formatMinDiffLabel(cfg.minDifficulty)} • ${cfg.timeLimitSec}s/mã)`;
+                const winText = prog.windowSize ? ` (${prog.windowSize} câu gần nhất)` : '';
+                dom.levelProgressMeta.textContent = `Acc ${prog.accuracyPct}%${winText} • Cần >=${cfg.minAccuracyPct}% • ${formatMinDiffLabel(cfg.minDifficulty)}`;
                 dom.levelProgressBar.style.width = `${pct}%`;
             }
 
@@ -2219,27 +2220,42 @@
                     return CONFIG.TRICKY_SINGLE[Math.floor(Math.random() * CONFIG.TRICKY_SINGLE.length)];
                 }
 
+                // Ở Lv.2 (3 chữ) & Lv.3 (6 chữ): trộn 40% xác suất chèn 1–2 chữ hay sai của cá nhân để trị dứt điểm điểm yếu
+                const topWeak = (state.mode === 'reflex' || state.mode === 'survival')
+                    ? getTopWeakChars(state.weakChars, 8).map((w) => w.ch)
+                    : [];
+                const injectWeakInto = (str) => {
+                    if (topWeak.length === 0 || Math.random() >= 0.4) return str;
+                    const arr = [...str];
+                    const injectCount = len >= 6 ? Math.min(2, topWeak.length) : 1;
+                    for (let k = 0; k < injectCount; k++) {
+                        const pos = Math.floor(Math.random() * arr.length);
+                        arr[pos] = topWeak[Math.floor(Math.random() * topWeak.length)];
+                    }
+                    return arr.join('');
+                };
+
                 if (Math.random() < 0.45) {
                     const exactMatches = CONFIG.MAPLE_WORDS.filter(w => w.length === len);
                     if (exactMatches.length > 0) {
-                        return exactMatches[Math.floor(Math.random() * exactMatches.length)];
+                        return injectWeakInto(exactMatches[Math.floor(Math.random() * exactMatches.length)]);
                     }
                     const baseWord = CONFIG.MAPLE_WORDS[Math.floor(Math.random() * CONFIG.MAPLE_WORDS.length)];
                     if (baseWord.length >= len) {
-                        return baseWord.slice(0, len);
+                        return injectWeakInto(baseWord.slice(0, len));
                     }
                     let combined = baseWord;
                     while (combined.length < len) {
                         combined += CONFIG.SYLLABLES[Math.floor(Math.random() * CONFIG.SYLLABLES.length)];
                     }
-                    return combined;
+                    return injectWeakInto(combined);
                 }
 
                 let out = '';
                 for (let i = 0; i < len; i++) {
                     out += CONFIG.SYLLABLES[Math.floor(Math.random() * CONFIG.SYLLABLES.length)];
                 }
-                return out;
+                return injectWeakInto(out);
             }
 
             function generateNewCaptcha() {
@@ -2420,8 +2436,16 @@
                 }, CONFIG.TIMEOUT_DELAY_MS);
             }
 
+            function requiresManualEnterSubmit() {
+                return state.mode === 'survival' || state.mode === 'test';
+            }
+
             function checkMatch(isManualSubmit = false) {
                 if (state.isTransitioning) return;
+                // Ở Lv.3 & Lv.4: tắt tự động nhảy câu — bắt buộc tự soát lại 6 chữ và bấm Enter / Kiểm tra giống in-game thật
+                if (requiresManualEnterSubmit() && !isManualSubmit) {
+                    return;
+                }
                 const val = dom.input.value.trim();
                 if (val === state.target) {
                     if (state.isComposing) {
@@ -2508,6 +2532,9 @@
                 dom.btnReveal.disabled = isTest;
                 dom.btnReveal.classList.toggle('opacity-40', isTest);
                 dom.btnSkip.title = isTest ? 'Bỏ qua mã này (tính sai)' : 'Đổi mã khác';
+                dom.input.placeholder = requiresManualEnterSubmit()
+                    ? 'Gõ xong tự soát kỹ rồi bấm Enter (hoặc Kiểm tra) để nộp...'
+                    : 'Gõ phím QWERTY hoặc bấm bàn phím ảo bên dưới...';
 
                 renderWeakCharsBar();
                 updateLevelProgressUI();

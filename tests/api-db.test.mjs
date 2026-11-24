@@ -348,3 +348,56 @@ test('4-Level progression, Admin timer settings, AFK outlier capping, and Reset 
     delete process.env.LOCAL_DB_URL;
     resetDbClientForTest();
 });
+
+test('Rolling 30-attempt window allows recovery from early mistakes without getting stuck', async () => {
+    process.env.LOCAL_DB_URL = ':memory:';
+    delete process.env.TURSO_DATABASE_URL;
+    delete process.env.ADMIN_PIN;
+    resetDbClientForTest();
+
+    const setRes = createMockRes();
+    await adminHandler({
+        method: 'PATCH',
+        body: {
+            action: 'update-settings',
+            levelConfig: {
+                lockProgression: true,
+                levels: { 1: { timeLimitSec: 8, requiredSolved: 30, minAccuracyPct: 90, minDifficulty: 'easy' } }
+            }
+        },
+        headers: {}
+    }, setRes);
+
+    const reg = createMockRes();
+    await playerHandler({ method: 'POST', body: { action: 'login', name: 'Newbie', pin: '2222' }, headers: {} }, reg);
+    const uid = reg.result.body.profile.userId;
+
+    for (let i = 0; i < 5; i++) {
+        const r = createMockRes();
+        await attemptHandler({
+            method: 'POST',
+            body: { userId: uid, name: 'Newbie', mode: 'practice', difficulty: 'easy', target: '가', typedInput: '나', isCorrect: false, errorType: 'wrong', elapsedMs: 2000 },
+            headers: {}
+        }, r);
+    }
+
+    let lastBody = null;
+    for (let i = 0; i < 30; i++) {
+        const r = createMockRes();
+        await attemptHandler({
+            method: 'POST',
+            body: { userId: uid, name: 'Newbie', mode: 'practice', difficulty: 'easy', target: '가', typedInput: '가', isCorrect: true, elapsedMs: 1800 },
+            headers: {}
+        }, r);
+        lastBody = r.result.body;
+    }
+
+    assert.equal(lastBody.levelProgress[1].solved, 30);
+    assert.equal(lastBody.levelProgress[1].accuracyPct, 100);
+    assert.equal(lastBody.levelProgress[1].windowSize, 30);
+    assert.equal(lastBody.currentLevel, 2);
+    assert.equal(lastBody.leveledUp, true);
+
+    delete process.env.LOCAL_DB_URL;
+    resetDbClientForTest();
+});
