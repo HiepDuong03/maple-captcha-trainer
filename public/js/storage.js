@@ -146,13 +146,14 @@ export const StorageService = (() => {
             }
 
             const remoteProfile = playerResp.data?.profile || null;
+            const levelConfig = playerResp.data?.levelConfig || adminResp.data?.levelConfig || null;
             const merged = mergeProfiles(localProfile, remoteProfile);
             if (merged) saveLocalProfile(merged);
 
-            return { online: dbMode !== 'offline', dbMode, userId, profile: merged };
+            return { online: dbMode !== 'offline', dbMode, userId, profile: merged, levelConfig };
         } catch {
             dbMode = 'offline';
-            return { online: false, dbMode, userId, profile: localProfile };
+            return { online: false, dbMode, userId, profile: localProfile, levelConfig: null };
         }
     }
 
@@ -215,7 +216,7 @@ export const StorageService = (() => {
         updateLocalCache(record, attemptPayload);
 
         try {
-            await apiFetch('/api/attempt', {
+            const resp = await apiFetch('/api/attempt', {
                 method: 'POST',
                 body: JSON.stringify({
                     ...record,
@@ -229,8 +230,12 @@ export const StorageService = (() => {
                     elapsedMs: attemptPayload.elapsedMs || 0
                 })
             });
+            if (resp.status === 200 && resp.data?.ok) {
+                return resp.data;
+            }
+            return null;
         } catch {
-            // Bỏ qua lỗi mạng, đã lưu local
+            return null;
         }
     }
 
@@ -298,7 +303,7 @@ export const StorageService = (() => {
                 if (prof.todaySolved) dailyStats[today] = prof.todaySolved;
                 const fullProfile = { ...prof, dailyStats };
                 saveLocalProfile(fullProfile);
-                return { ok: true, authMode: resp.data.authMode, profile: fullProfile };
+                return { ok: true, authMode: resp.data.authMode, profile: fullProfile, levelConfig: resp.data.levelConfig || null };
             }
             return { ok: false, code: resp.data?.code, error: resp.data?.error || 'Đăng nhập thất bại.' };
         } catch {
@@ -341,6 +346,26 @@ export const StorageService = (() => {
         return resp.data;
     }
 
+    async function updateLevelSettings(levelConfig, pin = '') {
+        const usePin = pin || getSavedAdminPin();
+        const resp = await apiFetch('/api/admin', {
+            method: 'PATCH',
+            headers: usePin ? { 'x-admin-pin': usePin } : {},
+            body: JSON.stringify({ action: 'update-settings', levelConfig })
+        });
+        return resp.data;
+    }
+
+    async function setMemberLevel(playerId, level, pin = '') {
+        const usePin = pin || getSavedAdminPin();
+        const resp = await apiFetch('/api/admin', {
+            method: 'PATCH',
+            headers: usePin ? { 'x-admin-pin': usePin } : {},
+            body: JSON.stringify({ action: 'set-level', playerId, level })
+        });
+        return resp.data;
+    }
+
     async function resetAdminData({ scope = 'player', playerId = '', pin = '' } = {}) {
         const usePin = pin || getSavedAdminPin();
         const params = new URLSearchParams({ scope });
@@ -362,6 +387,8 @@ export const StorageService = (() => {
         recordTestSession,
         fetchAdminDashboard,
         resetMemberPin,
+        updateLevelSettings,
+        setMemberLevel,
         resetAdminData,
         loadPrefs,
         savePrefs,

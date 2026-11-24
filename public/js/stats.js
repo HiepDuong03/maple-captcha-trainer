@@ -147,14 +147,46 @@ export function classifyMemberAndRecommend(member, thresholds = { minSolved: 10,
     const solved = Number(member?.solved || 0);
     const acc = Number(member?.accuracyPct ?? 100);
     const avgSec = Number(member?.avgTimeSec || 0);
+    const currentLevel = Number(member?.currentLevel || 0);
+    const completed = Boolean(member?.completed);
     const weakList = (member?.topWeakChars || []).map((w) => (typeof w === 'string' ? w : w.char)).filter(Boolean).slice(0, 3);
-    const weakSuffix = weakList.length > 0 ? ` • Luyện chữ hay sai: ${weakList.join(', ')}` : '';
+    const weakSuffix = weakList.length > 0 ? ` • Chữ hay sai: ${weakList.join(', ')}` : '';
+
+    // Chế độ đánh giá theo Level (Lv.1 -> Lv.4 -> Hoàn thành)
+    if (completed) {
+        return {
+            tier: 'pass',
+            badge: '🏆 Hoàn thành (Lv.4)',
+            advice: weakList.length > 0
+                ? `Đã vượt qua Thi Test — đạt chuẩn cày game${weakSuffix}`
+                : 'Đã vượt qua Thi Test — đạt chuẩn cày game!'
+        };
+    }
+
+    if (currentLevel >= 1) {
+        const levelNames = { 1: 'Lv.1 (1 chữ)', 2: 'Lv.2 (3 chữ)', 3: 'Lv.3 (6 chữ)', 4: 'Lv.4 (Thi Test)' };
+        const lvlLabel = levelNames[currentLevel] || `Lv.${currentLevel}`;
+        if (solved > 0 && acc < thresholds.urgentAcc) {
+            return {
+                tier: 'urgent',
+                badge: `${lvlLabel} • Cần bổ túc`,
+                advice: `Chính xác thấp (${acc}%) ở ${lvlLabel} — cần luyện chắc tay trước khi lên cấp${weakSuffix}`
+            };
+        }
+        return {
+            tier: 'improve',
+            badge: `🔥 ${lvlLabel}`,
+            advice: currentLevel === 4
+                ? `Đã mở khóa Thi Test — làm bài thi đạt >=90% để hoàn thành${weakSuffix}`
+                : `Đang leo ${lvlLabel} (Acc ${acc}%${avgSec > 0 ? ` • TB ${avgSec.toFixed(1)}s` : ''}) — hoàn thành mục tiêu để mở Lv.${currentLevel + 1}${weakSuffix}`
+        };
+    }
 
     if (solved === 0) {
         return {
             tier: 'improve',
             badge: 'Chưa luyện đủ',
-            advice: 'Bắt đầu với chế độ 1. Tập Phím (bật gợi ý) để quen vị trí phím 2-Set.'
+            advice: 'Bắt đầu với Lv.1 (1 chữ) để quen vị trí phím 2-Set.'
         };
     }
 
@@ -178,7 +210,7 @@ export function classifyMemberAndRecommend(member, thresholds = { minSolved: 10,
             badge: 'Đạt chuẩn',
             advice: weakList.length > 0
                 ? `Đạt chuẩn cày game — duy trì 15–20 mã/ngày${weakSuffix}`
-                : 'Đạt chuẩn cày game — duy trì đều tay bằng Sinh Tồn (35s) hoặc Thi Test.'
+                : 'Đạt chuẩn cày game — duy trì đều tay bằng Sinh Tồn hoặc Thi Test.'
         };
     }
 

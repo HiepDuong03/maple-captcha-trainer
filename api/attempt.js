@@ -1,5 +1,7 @@
 import { getDb } from '../lib/db.js';
 import { extractCharMistakes, getDayKey } from '../lib/mistakes.js';
+import { normalizeNameKey } from '../lib/auth.js';
+import { getLevelConfig, computePlayerLevelProgress, MODE_TO_LEVEL } from '../lib/levels.js';
 import { sendJson, readJsonBody } from '../lib/http.js';
 
 export default async function handler(req, res) {
@@ -19,83 +21,54 @@ export default async function handler(req, res) {
             return;
         }
 
+        const db = await getDb();
+        const levelConfig = await getLevelConfig(db);
+
         const isCorrect = Boolean(body.isCorrect);
         const errorType = isCorrect ? '' : String(body.errorType || 'wrong');
         const typedInput = String(body.typedInput || '').trim().slice(0, 64);
-        const elapsedMs = Math.max(0, Math.round(Number(body.elapsedMs || 0)));
-        const mode = String(body.mode || 'reflex');
+        const mode = String(body.mode || 'practice');
+        const lvlNum = MODE_TO_LEVEL[mode] || 1;
+        const maxAllowedMs = (levelConfig.levels[lvlNum]?.timeLimitSec || 35) * 1000;
+        // Chặn thời gian AFK: không bao giờ ghi nhận elapsedMs vượt quá thời gian giới hạn của Level
+        const rawElapsedMs = Math.max(100, Math.round(Number(body.elapsedMs || 0)));
+        const elapsedMs = Math.min(rawElapsedMs, maxAllowedMs);
+
         const difficulty = String(body.difficulty || 'medium');
-        const length = Number(body.length || [...target].length || 6);
+        const length = Number(body.length || [...target].length || 1);
         const now = Date.now();
         const dayKey = getDayKey(now);
+        const nameKey = normalizeNameKey(playerName);
 
-        const db = await getDb();
-
-        // Đảm bảo player tồn tại và cập nhật thống kê tổng hợp mới nhất
+        // 1. Đảm bảo player tồn tại trước khi ghi log
         await db.execute({
             sql: `INSERT INTO players (
-                    id, name, solved, best_combo, total_time_ms,
-                    wrong_count, reveal_count, timeout_count, accuracy_pct,
-                    best_test_label, last_mode, last_difficulty, last_length,
-                    last_active_at, created_at
-                  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    id, name, name_key, pin_hash, current_level, completed_at,
+                    best_combo, last_mode, last_difficulty, last_length, last_active_at, created_at
+                  ) VALUES (?, ?, ?, '', 1, 0, ?, ?, ?, ?, ?, ?)
                   ON CONFLICT(id) DO UPDATE SET
                     name = excluded.name,
-                    solved = excluded.solved,
+                    name_key = CASE WHEN players.name_key = '' THEN excluded.name_key ELSE players.name_key END,
                     best_combo = MAX(players.best_combo, excluded.best_combo),
-                    total_time_ms = excluded.total_time_ms,
-                    wrong_count = excluded.wrong_count,
-                    reveal_count = excluded.reveal_count,
-                    timeout_count = excluded.timeout_count,
-                    accuracy_pct = excluded.accuracy_pct,
-                    best_test_label = CASE WHEN excluded.best_test_label != '' THEN excluded.best_test_label ELSE players.best_test_label END,
                     last_mode = excluded.last_mode,
                     last_difficulty = excluded.last_difficulty,
                     last_length = excluded.last_length,
                     last_active_at = excluded.last_active_at`,
-            args: [
-                playerId,
-                playerName,
-                Number(body.solved || 0),
-                Number(body.bestCombo || 0),
-                Number(body.totalTimeMs || 0),
-                Number(body.wrongCount || 0),
-                Number(body.revealCount || 0),
-                Number(body.timeoutCount || 0),
-                Number(body.accuracyPct ?? 100),
-                String(body.bestTestLabel || ''),
-                mode,
-                difficulty,
-                length,
-                now,
-                now
-            ]
+            args: [playerId, playerName, nameKey, Number(body.bestCombo || 0), mode, difficulty, length, now, now]
         });
 
-        // Ghi log chi tiết từng lần thử
+        // 2. Ghi log chi tiết từng lần thử
         const attemptRes = await db.execute({
             sql: `INSERT INTO attempt_logs (
                     player_id, mode, difficulty, target, typed_input,
                     is_correct, error_type, elapsed_ms, day_key, created_at
                   ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            args: [
-                playerId,
-                mode,
-                difficulty,
-                target,
-                typedInput,
-                isCorrect ? 1 : 0,
-                errorType,
-                elapsedMs,
-                dayKey,
-                now
-            ]
+            args: [playerId, mode, difficulty, target, typedInput, isCorrect ? 1 : 0, errorType, elapsedMs, dayKey, now]
         });
 
         const attemptId = Number(attemptRes.lastInsertRowid || 0);
         let mistakesRecorded = 0;
 
-        // Nếu là lỗi -> phân tích từng ký tự sai / cặp nhầm lẫn (target -> typed)
         if (!isCorrect) {
             const mistakes = extractCharMistakes(target, typedInput, errorType);
             if (mistakes.length > 0) {
@@ -111,7 +84,55 @@ export default async function handler(req, res) {
             }
         }
 
-        sendJson(res, 200, { ok: true, attemptId, mistakesRecorded });
+        // 3. Tính lại toàn bộ chỉ số & Level trực tiếp từ SQL (chống lệch dữ liệu giữa nhiều tab/thiết bị)
+        const [prevPlayerRes, aggRes, levelInfo] = await Promise.all([
+            db.execute({ sql: 'SELECT current_level FROM players WHERE id = ?', args: [playerId] }),
+            db.execute({
+                sql: `SELECT
+                        SUM(CASE WHEN is_correct = 1 THEN 1 ELSE 0 END) AS solved_cnt,
+                        SUM(CASE WHEN is_correct = 0 AND error_type IN ('wrong', 'skip') THEN 1 ELSE 0 END) AS wrong_cnt,
+                        SUM(CASE WHEN is_correct = 0 AND error_type = 'reveal' THEN 1 ELSE 0 END) AS reveal_cnt,
+                        SUM(CASE WHEN is_correct = 0 AND error_type = 'timeout' THEN 1 ELSE 0 END) AS timeout_cnt,
+                        SUM(CASE WHEN is_correct = 1 THEN MIN(elapsed_ms, 60000) ELSE 0 END) AS clean_time_ms
+                      FROM attempt_logs
+                      WHERE player_id = ?`,
+                args: [playerId]
+            }),
+            computePlayerLevelProgress(db, playerId, levelConfig)
+        ]);
+
+        const prevLevel = Number(prevPlayerRes.rows[0]?.current_level || 1);
+        const newLevel = Math.max(prevLevel, levelInfo.computedLevel);
+        const leveledUp = newLevel > prevLevel;
+
+        const agg = aggRes.rows[0] || {};
+        const solved = Number(agg.solved_cnt || 0);
+        const wrongCount = Number(agg.wrong_cnt || 0);
+        const revealCount = Number(agg.reveal_cnt || 0);
+        const timeoutCount = Number(agg.timeout_cnt || 0);
+        const total = solved + wrongCount + revealCount + timeoutCount;
+        const accuracyPct = total > 0 ? Number(((solved / total) * 100).toFixed(1)) : 100;
+        const totalTimeMs = Number(agg.clean_time_ms || 0);
+
+        await db.execute({
+            sql: `UPDATE players
+                  SET solved = ?, total_time_ms = ?, wrong_count = ?, reveal_count = ?,
+                      timeout_count = ?, accuracy_pct = ?, current_level = ?,
+                      completed_at = CASE WHEN ? > 0 AND completed_at = 0 THEN ? ELSE completed_at END
+                  WHERE id = ?`,
+            args: [solved, totalTimeMs, wrongCount, revealCount, timeoutCount, accuracyPct, newLevel, levelInfo.completedAt, levelInfo.completedAt, playerId]
+        });
+
+        sendJson(res, 200, {
+            ok: true,
+            attemptId,
+            mistakesRecorded,
+            currentLevel: newLevel,
+            leveledUp,
+            completed: levelInfo.completed,
+            levelProgress: levelInfo.progress,
+            summary: { solved, wrongCount, revealCount, timeoutCount, accuracyPct, totalTimeMs }
+        });
     } catch (err) {
         console.error('[api/attempt]', err);
         sendJson(res, 500, { ok: false, error: 'Internal server error' });

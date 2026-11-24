@@ -2,11 +2,24 @@ import crypto from 'node:crypto';
 import { getDb, resolveDbConfig } from '../lib/db.js';
 import { getDayKey } from '../lib/mistakes.js';
 import { normalizeNameKey, isValidPin, hashPin } from '../lib/auth.js';
+import { getLevelConfig, computePlayerLevelProgress } from '../lib/levels.js';
 import { sendJson, readJsonBody, getQueryParams } from '../lib/http.js';
 
-async function loadPlayerProfile(db, playerRow) {
+async function loadPlayerProfile(db, playerRow, levelConfig) {
     const today = getDayKey();
-    const [todayRes, weakRes] = await Promise.all([
+    const [aggRes, todayRes, weakRes, levelInfo] = await Promise.all([
+        db.execute({
+            sql: `SELECT
+                    SUM(CASE WHEN is_correct = 1 THEN 1 ELSE 0 END) AS solved_cnt,
+                    SUM(CASE WHEN is_correct = 0 AND error_type = 'wrong' THEN 1 ELSE 0 END) AS wrong_cnt,
+                    SUM(CASE WHEN is_correct = 0 AND error_type = 'reveal' THEN 1 ELSE 0 END) AS reveal_cnt,
+                    SUM(CASE WHEN is_correct = 0 AND error_type = 'timeout' THEN 1 ELSE 0 END) AS timeout_cnt,
+                    SUM(CASE WHEN is_correct = 0 AND error_type = 'skip' THEN 1 ELSE 0 END) AS skip_cnt,
+                    SUM(CASE WHEN is_correct = 1 THEN MIN(elapsed_ms, 60000) ELSE 0 END) AS clean_time_ms
+                  FROM attempt_logs
+                  WHERE player_id = ?`,
+            args: [playerRow.id]
+        }),
         db.execute({
             sql: 'SELECT COUNT(*) AS cnt FROM attempt_logs WHERE player_id = ? AND day_key = ? AND is_correct = 1',
             args: [playerRow.id, today]
@@ -19,8 +32,18 @@ async function loadPlayerProfile(db, playerRow) {
                   ORDER BY cnt DESC
                   LIMIT 10`,
             args: [playerRow.id]
-        })
+        }),
+        computePlayerLevelProgress(db, playerRow.id, levelConfig)
     ]);
+
+    const agg = aggRes.rows[0] || {};
+    const solved = Number(agg.solved_cnt || 0);
+    const wrongCount = Number(agg.wrong_cnt || 0) + Number(agg.skip_cnt || 0);
+    const revealCount = Number(agg.reveal_cnt || 0);
+    const timeoutCount = Number(agg.timeout_cnt || 0);
+    const totalAttempts = solved + wrongCount + revealCount + timeoutCount;
+    const accuracyPct = totalAttempts > 0 ? Number(((solved / totalAttempts) * 100).toFixed(1)) : 100;
+    const totalTimeMs = Number(agg.clean_time_ms || 0);
 
     const weakChars = {};
     for (const row of weakRes.rows) {
@@ -28,20 +51,27 @@ async function loadPlayerProfile(db, playerRow) {
         weakChars[String(row.expected_char)] = { wrong: cnt, total: cnt, totalMs: cnt * 2500 };
     }
 
+    const currentLevel = Math.max(Number(playerRow.current_level || 1), levelInfo.computedLevel);
+    const completed = levelInfo.completed || Number(playerRow.completed_at || 0) > 0;
+
     return {
         userId: playerRow.id,
         name: playerRow.name,
-        solved: Number(playerRow.solved || 0),
+        currentLevel,
+        completed,
+        completedAt: Number(playerRow.completed_at || levelInfo.completedAt || 0),
+        levelProgress: levelInfo.progress,
+        solved,
         bestCombo: Number(playerRow.best_combo || 0),
-        totalTimeMs: Number(playerRow.total_time_ms || 0),
-        wrongCount: Number(playerRow.wrong_count || 0),
-        revealCount: Number(playerRow.reveal_count || 0),
-        timeoutCount: Number(playerRow.timeout_count || 0),
-        accuracyPct: Number(playerRow.accuracy_pct ?? 100),
+        totalTimeMs,
+        wrongCount,
+        revealCount,
+        timeoutCount,
+        accuracyPct,
         bestTestLabel: playerRow.best_test_label || '',
-        lastMode: playerRow.last_mode || 'reflex',
+        lastMode: playerRow.last_mode || 'practice',
         lastDifficulty: playerRow.last_difficulty || 'medium',
-        lastLength: Number(playerRow.last_length || 6),
+        lastLength: Number(playerRow.last_length || 1),
         lastActiveAt: Number(playerRow.last_active_at || 0),
         todaySolved: Number(todayRes.rows[0]?.cnt || 0),
         weakChars
@@ -52,20 +82,21 @@ export default async function handler(req, res) {
     try {
         const db = await getDb();
         const cfg = resolveDbConfig();
+        const levelConfig = await getLevelConfig(db);
 
         if (req.method === 'GET') {
             const { id } = getQueryParams(req);
             if (!id) {
-                sendJson(res, 200, { ok: true, dbMode: cfg.mode });
+                sendJson(res, 200, { ok: true, dbMode: cfg.mode, levelConfig });
                 return;
             }
             const playerRes = await db.execute({ sql: 'SELECT * FROM players WHERE id = ?', args: [id] });
             if (playerRes.rows.length === 0) {
-                sendJson(res, 200, { ok: true, dbMode: cfg.mode, profile: null });
+                sendJson(res, 200, { ok: true, dbMode: cfg.mode, levelConfig, profile: null });
                 return;
             }
-            const profile = await loadPlayerProfile(db, playerRes.rows[0]);
-            sendJson(res, 200, { ok: true, dbMode: cfg.mode, profile });
+            const profile = await loadPlayerProfile(db, playerRes.rows[0], levelConfig);
+            sendJson(res, 200, { ok: true, dbMode: cfg.mode, levelConfig, profile });
             return;
         }
 
@@ -73,7 +104,6 @@ export default async function handler(req, res) {
             const body = await readJsonBody(req);
             const now = Date.now();
 
-            // Luồng Đăng nhập / Tạo hồ sơ bằng Tên + Mã PIN 4 số (gộp dữ liệu trên mọi thiết bị)
             if (body.action === 'login') {
                 const cleanName = String(body.name || '').trim().replace(/\s+/g, ' ').slice(0, 32);
                 const pin = String(body.pin || '').trim();
@@ -98,15 +128,14 @@ export default async function handler(req, res) {
                     const existing = existingRes.rows[0];
                     const storedHash = String(existing.pin_hash || '');
 
-                    // Hồ sơ cũ chưa có PIN hoặc vừa được Admin Reset PIN -> gắn PIN mới và giữ nguyên toàn bộ dữ liệu
                     if (!storedHash) {
                         await db.execute({
                             sql: 'UPDATE players SET name = ?, pin_hash = ?, last_active_at = ? WHERE id = ?',
                             args: [cleanName, pinHash, now, existing.id]
                         });
                         const refreshed = await db.execute({ sql: 'SELECT * FROM players WHERE id = ?', args: [existing.id] });
-                        const profile = await loadPlayerProfile(db, refreshed.rows[0]);
-                        sendJson(res, 200, { ok: true, dbMode: cfg.mode, authMode: 'claimed', profile });
+                        const profile = await loadPlayerProfile(db, refreshed.rows[0], levelConfig);
+                        sendJson(res, 200, { ok: true, dbMode: cfg.mode, authMode: 'claimed', levelConfig, profile });
                         return;
                     }
 
@@ -123,31 +152,30 @@ export default async function handler(req, res) {
                         sql: 'UPDATE players SET name = ?, last_active_at = ? WHERE id = ?',
                         args: [cleanName, now, existing.id]
                     });
-                    const profile = await loadPlayerProfile(db, { ...existing, name: cleanName, last_active_at: now });
-                    sendJson(res, 200, { ok: true, dbMode: cfg.mode, authMode: 'login', profile });
+                    const profile = await loadPlayerProfile(db, { ...existing, name: cleanName, last_active_at: now }, levelConfig);
+                    sendJson(res, 200, { ok: true, dbMode: cfg.mode, authMode: 'login', levelConfig, profile });
                     return;
                 }
 
-                // Tạo hồ sơ mới
                 const newId = 'p-' + crypto.randomUUID().slice(0, 10);
                 await db.execute({
                     sql: `INSERT INTO players (
-                            id, name, name_key, pin_hash,
+                            id, name, name_key, pin_hash, current_level, completed_at,
                             solved, best_combo, total_time_ms,
                             wrong_count, reveal_count, timeout_count, accuracy_pct,
                             best_test_label, last_mode, last_difficulty, last_length,
                             last_active_at, created_at
-                          ) VALUES (?, ?, ?, ?, 0, 0, 0, 0, 0, 0, 100, '', 'reflex', 'medium', 6, ?, ?)`,
+                          ) VALUES (?, ?, ?, ?, 1, 0, 0, 0, 0, 0, 0, 0, 100, '', 'practice', 'medium', 1, ?, ?)`,
                     args: [newId, cleanName, nameKey, pinHash, now, now]
                 });
 
                 const createdRes = await db.execute({ sql: 'SELECT * FROM players WHERE id = ?', args: [newId] });
-                const profile = await loadPlayerProfile(db, createdRes.rows[0]);
-                sendJson(res, 200, { ok: true, dbMode: cfg.mode, authMode: 'register', profile });
+                const profile = await loadPlayerProfile(db, createdRes.rows[0], levelConfig);
+                sendJson(res, 200, { ok: true, dbMode: cfg.mode, authMode: 'register', levelConfig, profile });
                 return;
             }
 
-            // Luồng đồng bộ thống kê của phiên đã đăng nhập
+            // Upsert cơ bản cho hồ sơ đang hoạt động (không ghi đè tổng solved/time từ client)
             const id = String(body.userId || '').trim();
             const name = String(body.name || '').trim().replace(/\s+/g, ' ').slice(0, 32);
             if (!id || name.length < 2) {
@@ -158,21 +186,14 @@ export default async function handler(req, res) {
             const nameKey = normalizeNameKey(name);
             await db.execute({
                 sql: `INSERT INTO players (
-                        id, name, name_key, pin_hash, solved, best_combo, total_time_ms,
-                        wrong_count, reveal_count, timeout_count, accuracy_pct,
-                        best_test_label, last_mode, last_difficulty, last_length,
+                        id, name, name_key, pin_hash, current_level, completed_at,
+                        best_combo, best_test_label, last_mode, last_difficulty, last_length,
                         last_active_at, created_at
-                      ) VALUES (?, ?, ?, '', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                      ) VALUES (?, ?, ?, '', 1, 0, ?, ?, ?, ?, ?, ?, ?)
                       ON CONFLICT(id) DO UPDATE SET
                         name = excluded.name,
                         name_key = CASE WHEN players.name_key = '' THEN excluded.name_key ELSE players.name_key END,
-                        solved = MAX(players.solved, excluded.solved),
                         best_combo = MAX(players.best_combo, excluded.best_combo),
-                        total_time_ms = MAX(players.total_time_ms, excluded.total_time_ms),
-                        wrong_count = MAX(players.wrong_count, excluded.wrong_count),
-                        reveal_count = MAX(players.reveal_count, excluded.reveal_count),
-                        timeout_count = MAX(players.timeout_count, excluded.timeout_count),
-                        accuracy_pct = excluded.accuracy_pct,
                         best_test_label = CASE WHEN excluded.best_test_label != '' THEN excluded.best_test_label ELSE players.best_test_label END,
                         last_mode = excluded.last_mode,
                         last_difficulty = excluded.last_difficulty,
@@ -182,17 +203,11 @@ export default async function handler(req, res) {
                     id,
                     name,
                     nameKey,
-                    Number(body.solved || 0),
                     Number(body.bestCombo || 0),
-                    Number(body.totalTimeMs || 0),
-                    Number(body.wrongCount || 0),
-                    Number(body.revealCount || 0),
-                    Number(body.timeoutCount || 0),
-                    Number(body.accuracyPct ?? 100),
                     String(body.bestTestLabel || ''),
-                    String(body.lastMode || 'reflex'),
+                    String(body.lastMode || 'practice'),
                     String(body.lastDifficulty || 'medium'),
-                    Number(body.lastLength || 6),
+                    Number(body.lastLength || 1),
                     now,
                     now
                 ]

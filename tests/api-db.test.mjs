@@ -270,3 +270,68 @@ test('Name + 4-digit PIN auth merges same player across devices, blocks wrong PI
     delete process.env.LOCAL_DB_URL;
     resetDbClientForTest();
 });
+
+test('4-Level progression, Admin timer settings, AFK outlier capping, and Reset Today data', async () => {
+    process.env.LOCAL_DB_URL = ':memory:';
+    delete process.env.TURSO_DATABASE_URL;
+    delete process.env.ADMIN_PIN;
+    resetDbClientForTest();
+
+    // 1. Admin configures Lv.1 to 6s / 2 solved to pass
+    const setRes = createMockRes();
+    await adminHandler({
+        method: 'PATCH',
+        body: {
+            action: 'update-settings',
+            levelConfig: {
+                lockProgression: true,
+                levels: {
+                    1: { timeLimitSec: 6, requiredSolved: 2, minAccuracyPct: 90 },
+                    2: { timeLimitSec: 15, requiredSolved: 2, minAccuracyPct: 90 }
+                }
+            }
+        },
+        headers: {}
+    }, setRes);
+    assert.equal(setRes.result.statusCode, 200);
+    assert.equal(setRes.result.body.levelConfig.levels[1].timeLimitSec, 6);
+    assert.equal(setRes.result.body.levelConfig.levels[2].timeLimitSec, 15);
+
+    // 2. Register player & submit 2 Lv.1 attempts (1st has huge AFK 142720ms -> must be capped to 6000ms!)
+    const reg = createMockRes();
+    await playerHandler({ method: 'POST', body: { action: 'login', name: 'Phương', pin: '1111' }, headers: {} }, reg);
+    const uid = reg.result.body.profile.userId;
+
+    const a1 = createMockRes();
+    await attemptHandler({
+        method: 'POST',
+        body: { userId: uid, name: 'Phương', mode: 'practice', target: '가', typedInput: '가', isCorrect: true, elapsedMs: 142720 },
+        headers: {}
+    }, a1);
+    assert.equal(a1.result.body.summary.totalTimeMs, 6000); // capped at Lv.1 timeLimitSec (6s)
+    assert.equal(a1.result.body.currentLevel, 1);
+
+    const a2 = createMockRes();
+    await attemptHandler({
+        method: 'POST',
+        body: { userId: uid, name: 'Phương', mode: 'practice', target: '나', typedInput: '나', isCorrect: true, elapsedMs: 2000 },
+        headers: {}
+    }, a2);
+    assert.equal(a2.result.body.currentLevel, 2);
+    assert.equal(a2.result.body.leveledUp, true);
+
+    // 3. Admin resets today's data -> todaySolved becomes 0, account still exists!
+    const delToday = createMockRes();
+    await adminHandler({ method: 'DELETE', url: '/api/admin?scope=today', headers: {} }, delToday);
+    assert.equal(delToday.result.statusCode, 200);
+    assert.equal(delToday.result.body.cleared, 'today');
+
+    const afterReset = createMockRes();
+    await adminHandler({ method: 'GET', url: '/api/admin?range=today', headers: {} }, afterReset);
+    assert.equal(afterReset.result.body.teamRecords.length, 1);
+    assert.equal(afterReset.result.body.teamRecords[0].todaySolved, 0);
+    assert.equal(afterReset.result.body.teamRecords[0].solved, 0);
+
+    delete process.env.LOCAL_DB_URL;
+    resetDbClientForTest();
+});

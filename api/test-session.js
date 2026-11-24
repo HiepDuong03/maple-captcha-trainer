@@ -23,6 +23,7 @@ export default async function handler(req, res) {
 
         const missedTargets = Array.isArray(body.missedTargets) ? body.missedTargets : [];
         const label = String(body.label || '');
+        const isPass = Boolean(body.isPass);
 
         const insertRes = await db.execute({
             sql: `INSERT INTO test_sessions (
@@ -38,24 +39,24 @@ export default async function handler(req, res) {
                 Number(body.accuracyPct || 0),
                 Number(body.avgSec || 0),
                 Number(body.totalSec || 0),
-                body.isPass ? 1 : 0,
+                isPass ? 1 : 0,
                 JSON.stringify(missedTargets),
                 dayKey,
                 now
             ]
         });
 
-        if (label) {
-            await db.execute({
-                sql: `UPDATE players
-                      SET best_test_label = CASE WHEN ? = 1 OR best_test_label = '' THEN ? ELSE best_test_label END,
-                          last_active_at = ?
-                      WHERE id = ?`,
-                args: [body.isPass ? 1 : 0, label, now, playerId]
-            });
-        }
+        await db.execute({
+            sql: `UPDATE players
+                  SET best_test_label = CASE WHEN ? = 1 OR best_test_label = '' THEN ? ELSE best_test_label END,
+                      current_level = CASE WHEN ? = 1 THEN 4 ELSE current_level END,
+                      completed_at = CASE WHEN ? = 1 AND completed_at = 0 THEN ? ELSE completed_at END,
+                      last_active_at = ?
+                  WHERE id = ?`,
+            args: [isPass ? 1 : 0, label, isPass ? 1 : 0, isPass ? 1 : 0, now, now, playerId]
+        });
 
-        sendJson(res, 200, { ok: true, sessionId: Number(insertRes.lastInsertRowid || 0) });
+        sendJson(res, 200, { ok: true, sessionId: Number(insertRes.lastInsertRowid || 0), completed: isPass });
     } catch (err) {
         console.error('[api/test-session]', err);
         sendJson(res, 500, { ok: false, error: 'Internal server error' });

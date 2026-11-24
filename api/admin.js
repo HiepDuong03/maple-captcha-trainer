@@ -1,6 +1,39 @@
 import { getDb, resolveDbConfig } from '../lib/db.js';
 import { getDayKey, getRangeStartTs } from '../lib/mistakes.js';
+import { getLevelConfig, saveLevelConfig, computePlayerLevelProgress } from '../lib/levels.js';
 import { sendJson, readJsonBody, getQueryParams, checkAdminAuth } from '../lib/http.js';
+
+async function resyncPlayersFromLogs(db) {
+    const playersRes = await db.execute('SELECT id FROM players');
+    for (const row of playersRes.rows) {
+        const pid = String(row.id);
+        const aggRes = await db.execute({
+            sql: `SELECT
+                    SUM(CASE WHEN is_correct = 1 THEN 1 ELSE 0 END) AS solved_cnt,
+                    SUM(CASE WHEN is_correct = 0 AND error_type IN ('wrong', 'skip') THEN 1 ELSE 0 END) AS wrong_cnt,
+                    SUM(CASE WHEN is_correct = 0 AND error_type = 'reveal' THEN 1 ELSE 0 END) AS reveal_cnt,
+                    SUM(CASE WHEN is_correct = 0 AND error_type = 'timeout' THEN 1 ELSE 0 END) AS timeout_cnt,
+                    SUM(CASE WHEN is_correct = 1 THEN MIN(elapsed_ms, 60000) ELSE 0 END) AS clean_time_ms
+                  FROM attempt_logs
+                  WHERE player_id = ?`,
+            args: [pid]
+        });
+        const a = aggRes.rows[0] || {};
+        const solved = Number(a.solved_cnt || 0);
+        const wrongCount = Number(a.wrong_cnt || 0);
+        const revealCount = Number(a.reveal_cnt || 0);
+        const timeoutCount = Number(a.timeout_cnt || 0);
+        const total = solved + wrongCount + revealCount + timeoutCount;
+        const acc = total > 0 ? Number(((solved / total) * 100).toFixed(1)) : 100;
+        const cleanTime = Number(a.clean_time_ms || 0);
+        await db.execute({
+            sql: `UPDATE players
+                  SET solved = ?, total_time_ms = ?, wrong_count = ?, reveal_count = ?, timeout_count = ?, accuracy_pct = ?
+                  WHERE id = ?`,
+            args: [solved, cleanTime, wrongCount, revealCount, timeoutCount, acc, pid]
+        });
+    }
+}
 
 export default async function handler(req, res) {
     try {
@@ -22,7 +55,21 @@ export default async function handler(req, res) {
                 sendJson(res, 200, { ok: true, resetPinFor: String(body.playerId) });
                 return;
             }
-            sendJson(res, 400, { ok: false, error: 'Unsupported action or missing playerId' });
+            if (body.action === 'update-settings' && body.levelConfig) {
+                const saved = await saveLevelConfig(db, body.levelConfig);
+                sendJson(res, 200, { ok: true, levelConfig: saved });
+                return;
+            }
+            if (body.action === 'set-level' && body.playerId) {
+                const lvl = Math.max(1, Math.min(4, Math.round(Number(body.level || 1))));
+                await db.execute({
+                    sql: `UPDATE players SET current_level = ? WHERE id = ?`,
+                    args: [lvl, String(body.playerId)]
+                });
+                sendJson(res, 200, { ok: true, playerId: String(body.playerId), currentLevel: lvl });
+                return;
+            }
+            sendJson(res, 400, { ok: false, error: 'Unsupported action or missing fields' });
             return;
         }
 
@@ -32,6 +79,17 @@ export default async function handler(req, res) {
                 return;
             }
             const { scope = 'player', playerId = '' } = getQueryParams(req);
+            if (scope === 'today') {
+                const todayKey = getDayKey();
+                await db.batch([
+                    { sql: 'DELETE FROM char_mistakes WHERE day_key = ?', args: [todayKey] },
+                    { sql: 'DELETE FROM attempt_logs WHERE day_key = ?', args: [todayKey] },
+                    { sql: 'DELETE FROM test_sessions WHERE day_key = ?', args: [todayKey] }
+                ], 'write');
+                await resyncPlayersFromLogs(db);
+                sendJson(res, 200, { ok: true, cleared: 'today', dayKey: todayKey });
+                return;
+            }
             if (scope === 'all') {
                 await db.batch([
                     'DELETE FROM char_mistakes',
@@ -52,7 +110,7 @@ export default async function handler(req, res) {
                 sendJson(res, 200, { ok: true, cleared: playerId });
                 return;
             }
-            sendJson(res, 400, { ok: false, error: 'Missing playerId or scope=all' });
+            sendJson(res, 400, { ok: false, error: 'Missing playerId or valid scope' });
             return;
         }
 
@@ -64,10 +122,23 @@ export default async function handler(req, res) {
         const { range = 'all', playerId = '' } = getQueryParams(req);
         const todayKey = getDayKey();
         const sinceTs = getRangeStartTs(range);
+        const levelConfig = await getLevelConfig(db);
 
-        // 1. Luôn trả danh sách tổng quan team (leaderboard + top 3 chữ yếu của từng người để gợi ý bổ túc)
-        const [playersRes, todayCountsRes, playerWeakRes] = await Promise.all([
-            db.execute('SELECT * FROM players ORDER BY solved DESC, last_active_at DESC'),
+        // Tính trực tiếp thống kê chuẩn từ attempt_logs theo khoảng thời gian (loại bỏ outlier AFK > 60s)
+        const [playersRes, rangeAggRes, todayCountsRes, playerWeakRes, passedTestsRes] = await Promise.all([
+            db.execute('SELECT * FROM players ORDER BY completed_at DESC, current_level DESC, solved DESC'),
+            db.execute({
+                sql: `SELECT
+                        player_id,
+                        SUM(CASE WHEN is_correct = 1 THEN 1 ELSE 0 END) AS solved_cnt,
+                        SUM(CASE WHEN is_correct = 0 THEN 1 ELSE 0 END) AS err_cnt,
+                        SUM(CASE WHEN is_correct = 1 THEN MIN(elapsed_ms, 60000) ELSE 0 END) AS clean_time_ms,
+                        AVG(CASE WHEN is_correct = 1 AND elapsed_ms <= 60000 THEN elapsed_ms END) AS avg_ms
+                      FROM attempt_logs
+                      WHERE created_at >= ?
+                      GROUP BY player_id`,
+                args: [sinceTs]
+            }),
             db.execute({
                 sql: `SELECT player_id, COUNT(*) AS cnt
                       FROM attempt_logs
@@ -82,8 +153,24 @@ export default async function handler(req, res) {
                       GROUP BY player_id, expected_char
                       ORDER BY player_id, cnt DESC`,
                 args: [sinceTs]
+            }),
+            db.execute({
+                sql: `SELECT player_id, COUNT(*) AS pass_cnt
+                      FROM test_sessions
+                      WHERE is_pass = 1
+                      GROUP BY player_id`
             })
         ]);
+
+        const rangeMap = new Map();
+        for (const r of rangeAggRes.rows) {
+            rangeMap.set(String(r.player_id), {
+                solved: Number(r.solved_cnt || 0),
+                errors: Number(r.err_cnt || 0),
+                cleanTimeMs: Number(r.clean_time_ms || 0),
+                avgSec: r.avg_ms ? Number((Number(r.avg_ms) / 1000).toFixed(2)) : 0
+            });
+        }
 
         const todayMap = new Map();
         for (const row of todayCountsRes.rows) {
@@ -100,45 +187,53 @@ export default async function handler(req, res) {
             }
         }
 
+        const passedSet = new Set(
+            passedTestsRes.rows.filter((r) => Number(r.pass_cnt || 0) > 0).map((r) => String(r.player_id))
+        );
+
         const teamRecords = playersRes.rows.map((p) => {
-            const solved = Number(p.solved || 0);
-            const totalTimeMs = Number(p.total_time_ms || 0);
+            const pid = String(p.id);
+            const rStats = rangeMap.get(pid) || { solved: 0, errors: 0, cleanTimeMs: 0, avgSec: 0 };
+            const totalRange = rStats.solved + rStats.errors;
+            const acc = totalRange > 0 ? Number(((rStats.solved / totalRange) * 100).toFixed(1)) : 100;
+            const completed = Number(p.completed_at || 0) > 0 || passedSet.has(pid);
+
             return {
-                id: p.id,
-                userId: p.id,
+                id: pid,
+                userId: pid,
                 name: p.name,
-                solved,
+                currentLevel: Number(p.current_level || 1),
+                completed,
+                completedAt: Number(p.completed_at || 0),
+                solved: rStats.solved,
+                errors: rStats.errors,
                 bestCombo: Number(p.best_combo || 0),
-                totalTimeMs,
-                avgTimeSec: solved > 0 ? Number((totalTimeMs / solved / 1000).toFixed(2)) : 0,
-                wrongCount: Number(p.wrong_count || 0),
-                revealCount: Number(p.reveal_count || 0),
-                timeoutCount: Number(p.timeout_count || 0),
-                accuracyPct: Number(p.accuracy_pct ?? 100),
-                todaySolved: todayMap.get(String(p.id)) || 0,
+                totalTimeMs: rStats.cleanTimeMs,
+                avgTimeSec: rStats.avgSec,
+                accuracyPct: acc,
+                todaySolved: todayMap.get(pid) || 0,
                 todayKey,
-                topWeakChars: weakMap.get(String(p.id)) || [],
+                topWeakChars: weakMap.get(pid) || [],
                 bestTestLabel: p.best_test_label || '',
                 lastMode: p.last_mode,
                 lastDifficulty: p.last_difficulty,
-                lastLength: Number(p.last_length || 6),
+                lastLength: Number(p.last_length || 1),
                 lastActiveAt: Number(p.last_active_at || 0)
             };
         });
 
-        // Nếu ADMIN_PIN được đặt nhưng request chưa cung cấp đúng PIN -> chỉ trả leaderboard cơ bản + cờ locked
         if (!auth.ok) {
             sendJson(res, 200, {
                 ok: true,
                 dbMode: cfg.mode,
                 pinRequired: true,
                 adminUnlocked: false,
+                levelConfig,
                 teamRecords
             });
             return;
         }
 
-        // 2. Phân tích lỗi cả team theo khoảng thời gian (today | 7d | 30d | all)
         const [errorBreakdownRes, topCharsRes, confusionPairsRes, recentTestsRes] = await Promise.all([
             db.execute({
                 sql: `SELECT
@@ -224,10 +319,9 @@ export default async function handler(req, res) {
             }))
         };
 
-        // 3. Chi tiết riêng cho 1 thành viên nếu Admin chọn xem
         let playerDetail = null;
         if (playerId) {
-            const [pMistakesRes, pPairsRes, pRecentErrorsRes, pTestsRes] = await Promise.all([
+            const [pMistakesRes, pPairsRes, pRecentErrorsRes, pTestsRes, pLevelInfo] = await Promise.all([
                 db.execute({
                     sql: `SELECT expected_char, COUNT(*) AS cnt
                           FROM char_mistakes
@@ -260,11 +354,13 @@ export default async function handler(req, res) {
                           ORDER BY created_at DESC
                           LIMIT 15`,
                     args: [playerId]
-                })
+                }),
+                computePlayerLevelProgress(db, playerId, levelConfig)
             ]);
 
             playerDetail = {
                 playerId,
+                levelProgress: pLevelInfo.progress,
                 topHardChars: pMistakesRes.rows.map((r) => ({ char: r.expected_char, mistakes: Number(r.cnt) })),
                 confusionPairs: pPairsRes.rows.map((r) => ({ expected: r.expected_char, actual: r.actual_char, count: Number(r.cnt) })),
                 recentErrors: pRecentErrorsRes.rows.map((r) => ({
@@ -273,7 +369,7 @@ export default async function handler(req, res) {
                     errorType: r.error_type,
                     mode: r.mode,
                     difficulty: r.difficulty,
-                    elapsedSec: Number((Number(r.elapsed_ms || 0) / 1000).toFixed(2)),
+                    elapsedSec: Number((Math.min(Number(r.elapsed_ms || 0), 60000) / 1000).toFixed(2)),
                     createdAt: Number(r.created_at)
                 })),
                 testHistory: pTestsRes.rows.map((r) => ({
@@ -293,6 +389,7 @@ export default async function handler(req, res) {
             dbMode: cfg.mode,
             pinRequired: auth.pinRequired,
             adminUnlocked: true,
+            levelConfig,
             teamRecords,
             analytics,
             playerDetail

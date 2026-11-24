@@ -54,19 +54,19 @@
                     </div>
                 </div>
 
-                <!-- Thanh 4 chế độ trên Desktop -->
+                <!-- Thanh 4 Level trên Desktop -->
                 <div class="hidden md:flex items-center bg-slate-950 p-0.5 rounded-xl border border-slate-800 text-xs">
-                    <button onclick="App.setMode('practice')" id="btn-mode-practice" class="mode-btn px-2.5 py-1.5 rounded-lg font-medium transition-all text-slate-400 hover:text-white">
-                        1. Tập Phím
+                    <button onclick="App.setMode('practice')" id="btn-mode-practice" class="mode-btn px-2.5 py-1.5 rounded-lg font-bold transition-all bg-amber-500 text-slate-950">
+                        Lv.1 (1 chữ)
                     </button>
-                    <button onclick="App.setMode('reflex')" id="btn-mode-reflex" class="mode-btn px-2.5 py-1.5 rounded-lg font-bold transition-all bg-amber-500 text-slate-950">
-                        2. Phản Xạ
+                    <button onclick="App.setMode('reflex')" id="btn-mode-reflex" class="mode-btn px-2.5 py-1.5 rounded-lg font-medium transition-all text-slate-400 hover:text-white">
+                        Lv.2 (3 chữ)
                     </button>
                     <button onclick="App.setMode('survival')" id="btn-mode-survival" class="mode-btn px-2.5 py-1.5 rounded-lg font-medium transition-all text-slate-400 hover:text-white">
-                        3. Sinh Tồn (35s)
+                        Lv.3 (6 chữ)
                     </button>
                     <button onclick="App.setMode('test')" id="btn-mode-test" class="mode-btn px-2.5 py-1.5 rounded-lg font-medium transition-all text-slate-400 hover:text-white">
-                        4. Thi Test
+                        Lv.4 (Thi)
                     </button>
                 </div>
 
@@ -92,19 +92,19 @@
                 </div>
             </div>
 
-            <!-- Thanh 4 chế độ trên Mobile / Tablet (4 cột đều, không wrap xấu) -->
-            <div class="grid grid-cols-4 md:hidden bg-slate-950 p-0.5 rounded-xl border border-slate-800 text-[11px] gap-0.5">
-                <button onclick="App.setMode('practice')" id="btn-mode-mobile-practice" class="py-1.5 px-1 rounded-lg font-medium text-center truncate transition-all text-slate-400">
-                    1. Tập Phím
+            <!-- Thanh 4 Level trên Mobile / Tablet (4 cột đều, không wrap xấu) -->
+            <div class="grid grid-cols-4 md:hidden bg-slate-950 p-0.5 rounded-xl border border-slate-800 text-[10px] gap-0.5">
+                <button onclick="App.setMode('practice')" id="btn-mode-mobile-practice" class="py-1.5 px-1 rounded-lg font-bold text-center truncate transition-all bg-amber-500 text-slate-950">
+                    Lv.1 (1c)
                 </button>
-                <button onclick="App.setMode('reflex')" id="btn-mode-mobile-reflex" class="py-1.5 px-1 rounded-lg font-bold text-center truncate transition-all bg-amber-500 text-slate-950">
-                    2. Phản Xạ
+                <button onclick="App.setMode('reflex')" id="btn-mode-mobile-reflex" class="py-1.5 px-1 rounded-lg font-medium text-center truncate transition-all text-slate-400">
+                    Lv.2 (3c)
                 </button>
                 <button onclick="App.setMode('survival')" id="btn-mode-mobile-survival" class="py-1.5 px-1 rounded-lg font-medium text-center truncate transition-all text-slate-400">
-                    3. ST (35s)
+                    Lv.3 (6c)
                 </button>
                 <button onclick="App.setMode('test')" id="btn-mode-mobile-test" class="py-1.5 px-1 rounded-lg font-medium text-center truncate transition-all text-slate-400">
-                    4. Thi Test
+                    Lv.4 (Thi)
                 </button>
             </div>
         </div>
@@ -148,14 +148,25 @@
         <!-- Khung giả lập cửa sổ Captcha trong game -->
         <section id="captcha-window" class="relative bg-slate-900/95 border border-slate-800 rounded-2xl p-2.5 sm:p-4 shadow-2xl overflow-hidden">
 
-            <!-- Thanh đếm ngược cho chế độ Sinh Tồn -->
-            <div id="survival-timer-wrap" class="hidden mb-2">
+            <!-- Thanh đếm ngược áp dụng cho CẢ 4 LEVEL (Admin cấu hình giây) -->
+            <div id="survival-timer-wrap" class="mb-2">
                 <div class="flex items-center justify-between text-xs font-bold mb-1">
-                    <span class="text-rose-400">⏱ THỜI GIAN CÒN LẠI</span>
-                    <span id="survival-time-text" class="text-rose-300 font-mono">35.0s</span>
+                    <span id="timer-level-label" class="text-amber-300">⏱ THỜI GIAN LEVEL 1</span>
+                    <span id="survival-time-text" class="text-rose-300 font-mono">8.0s</span>
                 </div>
                 <div class="w-full h-2 bg-slate-950 rounded-full overflow-hidden border border-slate-800">
                     <div id="survival-bar" class="h-full bg-gradient-to-r from-emerald-400 via-amber-400 to-rose-500 transition-all duration-75" style="width: 100%;"></div>
+                </div>
+            </div>
+
+            <!-- Thanh tiến độ qua màn cho Level 1 -> Level 3 -->
+            <div id="level-progress-wrap" class="mb-2 bg-slate-950/75 border border-slate-800 rounded-xl px-2.5 py-1.5 flex flex-col gap-1">
+                <div class="flex items-center justify-between gap-2 text-[11px]">
+                    <span id="level-progress-label" class="font-bold text-slate-200">Tiến độ Lv.1 (1 chữ): 0/20 mã</span>
+                    <span id="level-progress-meta" class="text-slate-400">Yêu cầu: &gt;=90%</span>
+                </div>
+                <div class="w-full h-1.5 bg-slate-900 rounded-full overflow-hidden">
+                    <div id="level-progress-bar" class="h-full bg-emerald-400 transition-all duration-200" style="width: 0%;"></div>
                 </div>
             </div>
 
@@ -369,14 +380,17 @@
                 </div>
             </div>
 
-            <!-- Thanh chọn 2 tab + PIN Admin (nếu có) -->
+            <!-- Thanh chọn 3 tab Admin + PIN Admin (nếu có) -->
             <div class="px-3.5 sm:px-5 py-2 border-b border-slate-800 bg-slate-950/70 flex flex-wrap items-center justify-between gap-2">
-                <div class="grid grid-cols-2 sm:inline-flex gap-1 bg-slate-900 p-1 rounded-xl border border-slate-800 text-xs w-full sm:w-auto">
-                    <button onclick="App.setAdminTab('overview')" id="admin-tab-overview" class="px-3 py-1.5 rounded-lg font-bold bg-amber-500 text-slate-950 transition-all">
-                        🎯 Đánh giá &amp; Bổ túc
+                <div class="grid grid-cols-3 sm:inline-flex gap-1 bg-slate-900 p-1 rounded-xl border border-slate-800 text-[11px] sm:text-xs w-full sm:w-auto">
+                    <button onclick="App.setAdminTab('overview')" id="admin-tab-overview" class="px-2.5 sm:px-3 py-1.5 rounded-lg font-bold bg-amber-500 text-slate-950 transition-all truncate">
+                        🎯 Đánh giá &amp; Level
                     </button>
-                    <button onclick="App.setAdminTab('errors')" id="admin-tab-errors" class="px-3 py-1.5 rounded-lg font-medium text-slate-400 hover:text-white transition-all">
-                        🔥 Lỗi chung cả team
+                    <button onclick="App.setAdminTab('errors')" id="admin-tab-errors" class="px-2.5 sm:px-3 py-1.5 rounded-lg font-medium text-slate-400 hover:text-white transition-all truncate">
+                        🔥 Lỗi team
+                    </button>
+                    <button onclick="App.setAdminTab('settings')" id="admin-tab-settings" class="px-2.5 sm:px-3 py-1.5 rounded-lg font-medium text-slate-400 hover:text-white transition-all truncate">
+                        ⚙️ Cài đặt
                     </button>
                 </div>
 
@@ -390,22 +404,22 @@
             <div class="flex-1 overflow-y-auto px-3.5 sm:px-5 py-3 flex flex-col gap-3">
                 <!-- TAB 1: ĐÁNH GIÁ & HƯỚNG BỔ TÚC TỪNG THÀNH VIÊN -->
                 <div id="admin-panel-overview" class="flex flex-col gap-3">
-                    <!-- 3 thẻ lọc trạng thái cả team -->
+                    <!-- 3 thẻ lọc trạng thái theo Level -->
                     <div class="grid grid-cols-3 gap-2">
                         <button type="button" onclick="App.toggleAdminTierFilter('pass')" id="tier-card-pass" class="text-left bg-emerald-950/40 hover:bg-emerald-950/60 border border-emerald-500/30 rounded-xl p-2.5 transition-all">
-                            <div class="text-[10px] sm:text-xs font-semibold text-emerald-300">🟢 Đạt chuẩn</div>
+                            <div class="text-[10px] sm:text-xs font-semibold text-emerald-300">🏆 Hoàn thành</div>
                             <div id="mgr-tier-pass" class="text-lg sm:text-xl font-extrabold text-emerald-400 mt-0.5">0</div>
-                            <div class="hidden sm:block text-[10px] text-emerald-200/60">&gt;=90% &amp; &lt;=10s</div>
+                            <div class="hidden sm:block text-[10px] text-emerald-200/60">Đã Pass Lv.4 (Thi Test)</div>
                         </button>
                         <button type="button" onclick="App.toggleAdminTierFilter('improve')" id="tier-card-improve" class="text-left bg-amber-950/35 hover:bg-amber-950/55 border border-amber-500/30 rounded-xl p-2.5 transition-all">
-                            <div class="text-[10px] sm:text-xs font-semibold text-amber-300">🟡 Cần cải thiện</div>
+                            <div class="text-[10px] sm:text-xs font-semibold text-amber-300">🔥 Đang leo Level</div>
                             <div id="mgr-tier-improve" class="text-lg sm:text-xl font-extrabold text-amber-400 mt-0.5">0</div>
-                            <div class="hidden sm:block text-[10px] text-amber-200/60">80–89% hoặc 10–13s</div>
+                            <div class="hidden sm:block text-[10px] text-amber-200/60">Đang luyện Lv.1 → Lv.4</div>
                         </button>
                         <button type="button" onclick="App.toggleAdminTierFilter('urgent')" id="tier-card-urgent" class="text-left bg-rose-950/40 hover:bg-rose-950/60 border border-rose-500/30 rounded-xl p-2.5 transition-all">
-                            <div class="text-[10px] sm:text-xs font-semibold text-rose-300">🔴 Bổ túc gấp</div>
+                            <div class="text-[10px] sm:text-xs font-semibold text-rose-300">🔴 Cần bổ túc</div>
                             <div id="mgr-tier-urgent" class="text-lg sm:text-xl font-extrabold text-rose-400 mt-0.5">0</div>
-                            <div class="hidden sm:block text-[10px] text-rose-200/60">&lt;80% hoặc &gt;13s</div>
+                            <div class="hidden sm:block text-[10px] text-rose-200/60">Chính xác &lt;80%</div>
                         </button>
                     </div>
 
@@ -446,6 +460,11 @@
                 <!-- TAB 2: ĐIỂM YẾU CHUNG CẢ TEAM -->
                 <div id="admin-panel-errors" class="hidden flex flex-col gap-3">
                     <div id="admin-errors-content" class="flex flex-col gap-3"></div>
+                </div>
+
+                <!-- TAB 3: CÀI ĐẶT THỜI GIAN LEVEL & RESET DỮ LIỆU HÔM NAY -->
+                <div id="admin-panel-settings" class="hidden flex flex-col gap-3">
+                    <div id="admin-settings-content" class="flex flex-col gap-3"></div>
                 </div>
             </div>
         </div>
@@ -959,9 +978,25 @@
          * =========================================================================
          */
         const App = (() => {
+            const DEFAULT_LEVEL_CONFIG = {
+                lockProgression: true,
+                levels: {
+                    1: { level: 1, mode: 'practice', name: 'Lv.1: Tập Phím', shortName: 'Lv.1 (1 chữ)', mobileName: 'Lv.1 (1c)', charLength: 1, timeLimitSec: 8, requiredSolved: 20, minAccuracyPct: 90, allowHints: true },
+                    2: { level: 2, mode: 'reflex', name: 'Lv.2: Phản Xạ', shortName: 'Lv.2 (3 chữ)', mobileName: 'Lv.2 (3c)', charLength: 3, timeLimitSec: 18, requiredSolved: 20, minAccuracyPct: 90, allowHints: true },
+                    3: { level: 3, mode: 'survival', name: 'Lv.3: Sinh Tồn', shortName: 'Lv.3 (6 chữ)', mobileName: 'Lv.3 (6c)', charLength: 6, timeLimitSec: 35, requiredSolved: 15, minAccuracyPct: 90, allowHints: false },
+                    4: { level: 4, mode: 'test', name: 'Lv.4: Thi Test', shortName: 'Lv.4 (Thi)', mobileName: 'Lv.4 (Thi)', charLength: 6, timeLimitSec: 15, requiredSolved: 10, minAccuracyPct: 90, allowHints: false }
+                }
+            };
+            const MODE_TO_LEVEL = { practice: 1, reflex: 2, survival: 3, test: 4 };
+            const LEVEL_TO_MODE = { 1: 'practice', 2: 'reflex', 3: 'survival', 4: 'test' };
+
             const state = {
                 playerName: '',
-                mode: 'reflex',          // 'practice' | 'reflex' | 'survival' | 'test'
+                mode: 'practice',        // 'practice'(Lv1) | 'reflex'(Lv2) | 'survival'(Lv3) | 'test'(Lv4)
+                currentLevel: 1,
+                completed: false,
+                levelConfig: structuredClone(DEFAULT_LEVEL_CONFIG),
+                levelProgress: {},
                 target: '',
                 targetJamos: [],
                 jamoBuffer: [],
@@ -983,6 +1018,7 @@
                 isModalOpen: false,
                 survivalTimerId: null,
                 survivalEndTime: 0,
+                pausedRemainingMs: 0,
                 testSession: null,
                 lastTestResult: null,
                 adminTab: 'overview',
@@ -1011,8 +1047,13 @@
                 statAvgTime: document.getElementById('stat-avg-time'),
                 statBestTest: document.getElementById('stat-best-test'),
                 survivalWrap: document.getElementById('survival-timer-wrap'),
+                timerLevelLabel: document.getElementById('timer-level-label'),
                 survivalBar: document.getElementById('survival-bar'),
                 survivalTimeText: document.getElementById('survival-time-text'),
+                levelProgressWrap: document.getElementById('level-progress-wrap'),
+                levelProgressLabel: document.getElementById('level-progress-label'),
+                levelProgressMeta: document.getElementById('level-progress-meta'),
+                levelProgressBar: document.getElementById('level-progress-bar'),
                 testProgressWrap: document.getElementById('test-progress-wrap'),
                 testProgressText: document.getElementById('test-progress-text'),
                 testProgressBar: document.getElementById('test-progress-bar'),
@@ -1049,9 +1090,11 @@
                 adminPinInput: document.getElementById('admin-pin-input'),
                 adminPanelOverview: document.getElementById('admin-panel-overview'),
                 adminPanelErrors: document.getElementById('admin-panel-errors'),
+                adminPanelSettings: document.getElementById('admin-panel-settings'),
                 adminListView: document.getElementById('admin-list-view'),
                 adminMemberDetailView: document.getElementById('admin-member-detail-view'),
                 adminErrorsContent: document.getElementById('admin-errors-content'),
+                adminSettingsContent: document.getElementById('admin-settings-content'),
                 adminDetailContent: document.getElementById('admin-detail-content'),
                 btnResetPin: document.getElementById('btn-reset-pin'),
                 btnResetMember: document.getElementById('btn-reset-member'),
@@ -1100,9 +1143,80 @@
                 StorageService.savePlayerStats(buildStatsPayload());
             }
 
-            function logAttemptToDb({ isCorrect, errorType = '', typedInput = '', elapsedMs = 0 }) {
+            function getCurrentLevelNum() {
+                return MODE_TO_LEVEL[state.mode] || 1;
+            }
+
+            function getCurrentLevelCfg() {
+                const lvl = getCurrentLevelNum();
+                return state.levelConfig.levels[lvl] || DEFAULT_LEVEL_CONFIG.levels[lvl];
+            }
+
+            function applyLevelConfig(cfg) {
+                if (!cfg || !cfg.levels) return;
+                state.levelConfig = {
+                    lockProgression: cfg.lockProgression !== false,
+                    levels: {
+                        1: { ...DEFAULT_LEVEL_CONFIG.levels[1], ...(cfg.levels[1] || cfg.levels['1'] || {}) },
+                        2: { ...DEFAULT_LEVEL_CONFIG.levels[2], ...(cfg.levels[2] || cfg.levels['2'] || {}) },
+                        3: { ...DEFAULT_LEVEL_CONFIG.levels[3], ...(cfg.levels[3] || cfg.levels['3'] || {}) },
+                        4: { ...DEFAULT_LEVEL_CONFIG.levels[4], ...(cfg.levels[4] || cfg.levels['4'] || {}) }
+                    }
+                };
+                renderLevelButtons();
+                updateLevelProgressUI();
+            }
+
+            function renderLevelButtons() {
+                ['practice', 'reflex', 'survival', 'test'].forEach((m) => {
+                    const lvl = MODE_TO_LEVEL[m];
+                    const cfg = state.levelConfig.levels[lvl] || DEFAULT_LEVEL_CONFIG.levels[lvl];
+                    const isActive = m === state.mode;
+                    const isLocked = state.levelConfig.lockProgression && lvl > state.currentLevel;
+                    const isPassed = Boolean(state.levelProgress[lvl]?.passed) || (lvl < state.currentLevel) || (lvl === 4 && state.completed);
+                    const prefix = isPassed ? '✅ ' : (isLocked ? '🔒 ' : '');
+
+                    const btn = document.getElementById(`btn-mode-${m}`);
+                    if (btn) {
+                        btn.textContent = `${prefix}${cfg.shortName} (${cfg.timeLimitSec}s)`;
+                        btn.className = isActive
+                            ? 'mode-btn px-2.5 py-1.5 rounded-lg font-bold transition-all bg-amber-500 text-slate-950'
+                            : isLocked
+                                ? 'mode-btn px-2.5 py-1.5 rounded-lg font-medium transition-all text-slate-600 cursor-not-allowed'
+                                : 'mode-btn px-2.5 py-1.5 rounded-lg font-medium transition-all text-slate-300 hover:text-white';
+                    }
+
+                    const mBtn = document.getElementById(`btn-mode-mobile-${m}`);
+                    if (mBtn) {
+                        mBtn.textContent = `${prefix}${cfg.mobileName}`;
+                        mBtn.className = isActive
+                            ? 'py-1.5 px-1 rounded-lg font-bold text-center truncate transition-all bg-amber-500 text-slate-950'
+                            : isLocked
+                                ? 'py-1.5 px-1 rounded-lg font-medium text-center truncate transition-all text-slate-600'
+                                : 'py-1.5 px-1 rounded-lg font-medium text-center truncate transition-all text-slate-300';
+                    }
+                });
+            }
+
+            function updateLevelProgressUI() {
+                const lvl = getCurrentLevelNum();
+                const cfg = getCurrentLevelCfg();
+                if (lvl === 4) {
+                    dom.levelProgressWrap.classList.add('hidden');
+                    return;
+                }
+                dom.levelProgressWrap.classList.remove('hidden');
+                const prog = state.levelProgress[lvl] || { solved: 0, accuracyPct: 100, passed: false };
+                const pct = Math.min(100, Math.round((prog.solved / Math.max(1, cfg.requiredSolved)) * 100));
+                const doneBadge = prog.passed || lvl < state.currentLevel ? ' • ✅ Đã qua màn' : '';
+                dom.levelProgressLabel.textContent = `Tiến độ ${cfg.shortName}: ${prog.solved}/${cfg.requiredSolved} mã${doneBadge}`;
+                dom.levelProgressMeta.textContent = `Acc ${prog.accuracyPct}% (cần >=${cfg.minAccuracyPct}%) • ${cfg.timeLimitSec}s/mã`;
+                dom.levelProgressBar.style.width = `${pct}%`;
+            }
+
+            async function logAttemptToDb({ isCorrect, errorType = '', typedInput = '', elapsedMs = 0 }) {
                 if (!state.playerName) return;
-                StorageService.recordAttempt({
+                const resp = await StorageService.recordAttempt({
                     ...buildStatsPayload(),
                     target: state.target,
                     typedInput,
@@ -1110,6 +1224,35 @@
                     errorType,
                     elapsedMs
                 });
+                if (resp && resp.ok) {
+                    if (resp.summary) {
+                        state.solved = resp.summary.solved;
+                        state.wrongCount = resp.summary.wrongCount;
+                        state.revealCount = resp.summary.revealCount;
+                        state.timeoutCount = resp.summary.timeoutCount;
+                        state.totalTimeMs = resp.summary.totalTimeMs;
+                    }
+                    if (resp.levelProgress) state.levelProgress = resp.levelProgress;
+                    if (resp.currentLevel) state.currentLevel = resp.currentLevel;
+                    if (typeof resp.completed === 'boolean') state.completed = resp.completed;
+                    updateStatsUI();
+                    renderLevelButtons();
+                    updateLevelProgressUI();
+
+                    if (resp.leveledUp) {
+                        const nextMode = LEVEL_TO_MODE[resp.currentLevel];
+                        const nextCfg = state.levelConfig.levels[resp.currentLevel];
+                        showOverlay(
+                            `🎉 LÊN LEVEL ${resp.currentLevel}!`,
+                            `Đã mở khóa ${nextCfg?.shortName || `Lv.${resp.currentLevel}`}`,
+                            'text-amber-300',
+                            1500
+                        );
+                        if (nextMode) {
+                            setTimeout(() => setMode(nextMode), 1550);
+                        }
+                    }
+                }
             }
 
             function renderWeakCharsBar() {
@@ -1157,6 +1300,9 @@
 
             function applyLoadedProfile(profile) {
                 state.playerName = profile.name || '';
+                state.currentLevel = Number(profile.currentLevel || 1);
+                state.completed = Boolean(profile.completed);
+                state.levelProgress = profile.levelProgress || {};
                 state.solved = profile.solved || 0;
                 state.combo = 0;
                 state.bestCombo = profile.bestCombo || 0;
@@ -1171,7 +1317,7 @@
 
             function openNameModal(allowCancel = false) {
                 state.isModalOpen = true;
-                stopSurvivalTimer();
+                pauseTimer();
                 dom.nameErrorMsg.classList.add('hidden');
                 dom.nameErrorMsg.textContent = '';
                 dom.nameInput.value = state.playerName || '';
@@ -1187,7 +1333,7 @@
                 if (!state.playerName) return;
                 dom.nameModal.classList.add('hidden');
                 state.isModalOpen = false;
-                if (state.mode === 'survival') startSurvivalTimer();
+                resumeTimer();
                 if (!isMobileViewport()) dom.input.focus();
             }
 
@@ -1231,16 +1377,15 @@
                     return;
                 }
 
+                if (res.levelConfig) applyLevelConfig(res.levelConfig);
                 applyLoadedProfile(res.profile);
                 dom.nameModal.classList.add('hidden');
                 state.isModalOpen = false;
                 updateStatsUI();
-                if (!state.target) {
-                    setMode('reflex');
-                } else {
-                    if (state.mode === 'survival') startSurvivalTimer();
-                    if (!isMobileViewport()) dom.input.focus();
-                }
+                renderLevelButtons();
+                const startMode = LEVEL_TO_MODE[state.currentLevel] || 'practice';
+                setMode(startMode);
+                if (!isMobileViewport()) dom.input.focus();
             }
 
             function formatRelativeTime(ts) {
@@ -1424,17 +1569,140 @@
 
             function setAdminTab(tab) {
                 state.adminTab = tab;
-                ['overview', 'errors'].forEach((t) => {
+                ['overview', 'errors', 'settings'].forEach((t) => {
                     const btn = document.getElementById(`admin-tab-${t}`);
                     const panel = document.getElementById(`admin-panel-${t}`);
                     if (btn) {
                         btn.className = t === tab
-                            ? 'px-3 py-1.5 rounded-lg font-bold bg-amber-500 text-slate-950 transition-all'
-                            : 'px-3 py-1.5 rounded-lg font-medium text-slate-400 hover:text-white transition-all';
+                            ? 'px-2.5 sm:px-3 py-1.5 rounded-lg font-bold bg-amber-500 text-slate-950 transition-all truncate'
+                            : 'px-2.5 sm:px-3 py-1.5 rounded-lg font-medium text-slate-400 hover:text-white transition-all truncate';
                     }
                     if (panel) panel.classList.toggle('hidden', t !== tab);
                 });
                 if (tab === 'errors') renderAdminAnalytics();
+                if (tab === 'settings') renderAdminSettings();
+            }
+
+            function renderAdminSettings() {
+                const data = state.adminData;
+                if (data && data.pinRequired && !data.adminUnlocked) {
+                    dom.adminSettingsContent.innerHTML = `<div class="text-center py-10 text-sm text-amber-300">🔒 Nhập <strong>PIN Admin</strong> để chỉnh thời gian Level và Reset dữ liệu hôm nay.</div>`;
+                    return;
+                }
+                const cfg = state.levelConfig;
+                const rows = [1, 2, 3, 4].map((lvl) => {
+                    const c = cfg.levels[lvl];
+                    const reqLabel = lvl === 4 ? 'Số câu thi' : 'Số mã qua màn';
+                    return `
+                        <div class="bg-slate-950/80 border border-slate-800 rounded-xl p-3 grid grid-cols-1 sm:grid-cols-4 gap-2 items-center">
+                            <div>
+                                <div class="text-xs font-extrabold text-white">${escapeHtml(c.shortName)}</div>
+                                <div class="text-[10px] text-slate-400">${c.charLength} ký tự • ${c.allowHints ? 'Cho phép gợi ý' : 'Tắt gợi ý'}</div>
+                            </div>
+                            <label class="text-[11px] text-slate-300 flex flex-col gap-1">
+                                <span>Giới hạn giây / mã</span>
+                                <input type="number" min="3" max="120" id="cfg-sec-${lvl}" value="${c.timeLimitSec}" class="bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs font-bold text-amber-300 focus:outline-none focus:border-amber-500">
+                            </label>
+                            <label class="text-[11px] text-slate-300 flex flex-col gap-1">
+                                <span>${reqLabel}</span>
+                                <input type="number" min="1" max="200" id="cfg-req-${lvl}" value="${c.requiredSolved}" class="bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs font-bold text-emerald-300 focus:outline-none focus:border-amber-500">
+                            </label>
+                            <label class="text-[11px] text-slate-300 flex flex-col gap-1">
+                                <span>Chính xác tối thiểu (%)</span>
+                                <input type="number" min="50" max="100" id="cfg-acc-${lvl}" value="${c.minAccuracyPct}" class="bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs font-bold text-sky-300 focus:outline-none focus:border-amber-500">
+                            </label>
+                        </div>
+                    `;
+                }).join('');
+
+                dom.adminSettingsContent.innerHTML = `
+                    <form onsubmit="App.saveAdminSettings(event)" class="flex flex-col gap-2.5">
+                        <div class="flex items-center justify-between flex-wrap gap-2">
+                            <h3 class="text-xs font-extrabold text-white uppercase tracking-wider">⏱ Cài đặt thời gian đếm ngược &amp; điều kiện lên Level</h3>
+                            <label class="inline-flex items-center gap-1.5 text-xs text-slate-200 cursor-pointer bg-slate-950 border border-slate-800 px-2.5 py-1.5 rounded-xl">
+                                <input type="checkbox" id="cfg-lock-progression" ${cfg.lockProgression ? 'checked' : ''} class="accent-amber-500 w-3.5 h-3.5">
+                                <span>Khóa Level tuần tự (Lv.1 → 2 → 3 → 4)</span>
+                            </label>
+                        </div>
+                        ${rows}
+                        <div class="flex items-center justify-end gap-2 pt-1">
+                            <span id="cfg-save-status" class="text-xs text-emerald-400 font-semibold"></span>
+                            <button type="submit" class="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold text-xs transition-colors">
+                                💾 Lưu cài đặt toàn team
+                            </button>
+                        </div>
+                    </form>
+
+                    <div class="border-t border-slate-800 pt-3 mt-1 bg-rose-950/20 border border-rose-500/25 rounded-xl p-3 flex flex-wrap items-center justify-between gap-2.5">
+                        <div>
+                            <div class="text-xs font-extrabold text-rose-300">🔄 Reset dữ liệu luyện tập hôm nay (${getTodayKey()})</div>
+                            <div class="text-[11px] text-slate-400 mt-0.5">Xóa toàn bộ log luyện tập, lỗi và bài thi của riêng ngày hôm nay (giữ nguyên tài khoản &amp; dữ liệu các ngày trước).</div>
+                        </div>
+                        <button type="button" id="btn-reset-today" onclick="App.resetTodayData()" class="px-3.5 py-2 rounded-xl bg-rose-500/25 hover:bg-rose-500/40 border border-rose-500/50 text-rose-100 font-bold text-xs transition-colors">
+                            🔄 Reset dữ liệu hôm nay
+                        </button>
+                    </div>
+                `;
+            }
+
+            async function saveAdminSettings(event) {
+                if (event) event.preventDefault();
+                const nextCfg = {
+                    lockProgression: Boolean(document.getElementById('cfg-lock-progression')?.checked),
+                    levels: {}
+                };
+                for (const lvl of [1, 2, 3, 4]) {
+                    nextCfg.levels[lvl] = {
+                        ...state.levelConfig.levels[lvl],
+                        timeLimitSec: Number(document.getElementById(`cfg-sec-${lvl}`)?.value || state.levelConfig.levels[lvl].timeLimitSec),
+                        requiredSolved: Number(document.getElementById(`cfg-req-${lvl}`)?.value || state.levelConfig.levels[lvl].requiredSolved),
+                        minAccuracyPct: Number(document.getElementById(`cfg-acc-${lvl}`)?.value || state.levelConfig.levels[lvl].minAccuracyPct)
+                    };
+                }
+                const res = await StorageService.updateLevelSettings(nextCfg);
+                const statusEl = document.getElementById('cfg-save-status');
+                if (res && res.ok && res.levelConfig) {
+                    applyLevelConfig(res.levelConfig);
+                    if (statusEl) {
+                        statusEl.textContent = '✔ Đã lưu & áp dụng cho toàn team!';
+                        setTimeout(() => { statusEl.textContent = ''; }, 2500);
+                    }
+                } else if (statusEl) {
+                    statusEl.textContent = '❌ Lưu thất bại (kiểm tra PIN Admin).';
+                }
+            }
+
+            async function resetTodayData() {
+                const btn = document.getElementById('btn-reset-today');
+                if (btn && btn.dataset.armed !== '1') {
+                    btn.dataset.armed = '1';
+                    btn.textContent = '⚠️ Bấm lần nữa để xác nhận xóa hôm nay!';
+                    setTimeout(() => {
+                        if (btn) {
+                            btn.dataset.armed = '0';
+                            btn.textContent = '🔄 Reset dữ liệu hôm nay';
+                        }
+                    }, 4000);
+                    return;
+                }
+                const res = await StorageService.resetAdminData({ scope: 'today' });
+                if (res && res.ok) {
+                    if (btn) {
+                        btn.dataset.armed = '0';
+                        btn.textContent = '✔ Đã reset dữ liệu hôm nay!';
+                    }
+                    const today = getTodayKey();
+                    state.dailyStats[today] = 0;
+                    await refreshAdminDashboard();
+                    updateStatsUI();
+                }
+            }
+
+            async function setMemberLevelFromAdmin(playerId, level) {
+                const res = await StorageService.setMemberLevel(playerId, Number(level));
+                if (res && res.ok) {
+                    await refreshAdminDashboard();
+                }
             }
 
             function renderAdminAnalytics() {
@@ -1607,12 +1875,33 @@
                         </div>
                     `).join('');
 
+                const levelBarsHtml = pd.levelProgress
+                    ? `<div class="grid grid-cols-2 sm:grid-cols-4 gap-1.5 mt-1">` + [1, 2, 3, 4].map((lvl) => {
+                        const lp = pd.levelProgress[lvl] || { solved: 0, accuracyPct: 100, avgSec: 0, passed: false };
+                        return `
+                            <div class="bg-slate-900/90 border ${lp.passed ? 'border-emerald-500/40' : 'border-slate-800'} rounded-lg px-2 py-1.5 text-center">
+                                <div class="text-[10px] font-bold ${lp.passed ? 'text-emerald-300' : 'text-slate-300'}">${lp.passed ? '✅ ' : ''}Lv.${lvl}</div>
+                                <div class="text-[11px] font-extrabold text-white">${lp.solved} mã • ${lp.accuracyPct}%</div>
+                                <div class="text-[10px] text-sky-400 font-mono">${lp.avgSec > 0 ? `${lp.avgSec}s` : '--'}</div>
+                            </div>
+                        `;
+                    }).join('') + `</div>`
+                    : '';
+
+                const curLvl = member ? Number(member.currentLevel || 1) : 1;
                 dom.adminDetailContent.innerHTML = `
                     <div class="bg-slate-950/80 border border-indigo-500/35 rounded-xl p-3 flex flex-col gap-2">
                         <div class="flex items-center justify-between gap-2 flex-wrap">
                             <span class="text-sm font-extrabold text-white">👤 ${escapeHtml(memberName)}</span>
-                            ${assessment ? `<span class="text-xs font-bold text-amber-300">💡 ${escapeHtml(assessment.advice)}</span>` : ''}
+                            <div class="flex items-center gap-1.5 text-xs">
+                                <span class="text-slate-400">Mở khóa Level:</span>
+                                <select onchange="App.setMemberLevelFromAdmin('${escapeHtml(state.selectedAdminMemberId)}', this.value)" class="bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-xs font-bold text-amber-300 focus:outline-none">
+                                    ${[1, 2, 3, 4].map((l) => `<option value="${l}" ${l === curLvl ? 'selected' : ''}>Level ${l}</option>`).join('')}
+                                </select>
+                            </div>
                         </div>
+                        ${assessment ? `<div class="text-xs font-bold text-amber-300">💡 ${escapeHtml(assessment.advice)}</div>` : ''}
+                        ${levelBarsHtml}
                         <div class="flex flex-wrap items-center gap-1.5"><span class="text-[11px] text-slate-400">Chữ hay sai:</span> ${hardHtml}</div>
                         <div class="flex flex-wrap items-center gap-1.5"><span class="text-[11px] text-slate-400">Cặp hay nhầm:</span> ${pairHtml}</div>
                     </div>
@@ -1638,10 +1927,12 @@
                     pin: pinOverride
                 });
                 state.adminData = data;
+                if (data.levelConfig) applyLevelConfig(data.levelConfig);
                 dom.syncStatusPill.textContent = formatDbModeLabel(data.dbMode || StorageService.getDbMode());
                 dom.adminPinForm.classList.toggle('hidden', !(data.pinRequired && !data.adminUnlocked));
                 renderManagerBoard();
                 if (state.adminTab === 'errors') renderAdminAnalytics();
+                if (state.adminTab === 'settings') renderAdminSettings();
                 if (state.selectedAdminMemberId) renderAdminDetail();
             }
 
@@ -1690,7 +1981,7 @@
 
             function openManagerModal() {
                 state.isModalOpen = true;
-                stopSurvivalTimer();
+                pauseTimer();
                 dom.syncStatusPill.textContent = formatDbModeLabel(StorageService.getDbMode());
                 dom.managerModal.classList.remove('hidden');
                 closeMemberDetail();
@@ -1702,7 +1993,7 @@
                 dom.managerModal.classList.add('hidden');
                 state.isModalOpen = false;
                 if (state.playerName) {
-                    if (state.mode === 'survival') startSurvivalTimer();
+                    resumeTimer();
                     if (!isMobileViewport()) dom.input.focus();
                 }
             }
@@ -1756,16 +2047,39 @@
                 }
             }
 
-            function startSurvivalTimer() {
+            function pauseTimer() {
+                if (state.survivalTimerId && state.survivalEndTime > 0) {
+                    state.pausedRemainingMs = Math.max(200, state.survivalEndTime - performance.now());
+                }
                 stopSurvivalTimer();
-                if (state.mode !== 'survival' || state.isModalOpen) return;
-                const durationMs = CONFIG.SURVIVAL_MAX_TIME * 1000;
-                state.survivalEndTime = performance.now() + durationMs;
+            }
+
+            function resumeTimer() {
+                if (state.isModalOpen || state.isTransitioning || !state.target) return;
+                if (state.pausedRemainingMs > 0) {
+                    startSurvivalTimer(state.pausedRemainingMs);
+                    state.pausedRemainingMs = 0;
+                } else {
+                    startSurvivalTimer();
+                }
+            }
+
+            function startSurvivalTimer(customRemainingMs = null) {
+                stopSurvivalTimer();
+                if (state.isModalOpen || document.visibilityState === 'hidden') return;
+                const cfg = getCurrentLevelCfg();
+                const fullDurationMs = (cfg.timeLimitSec || 15) * 1000;
+                const runMs = customRemainingMs != null ? Math.min(customRemainingMs, fullDurationMs) : fullDurationMs;
+                state.survivalEndTime = performance.now() + runMs;
+                state.questionStartTime = performance.now() - (fullDurationMs - runMs);
+                if (dom.timerLevelLabel) {
+                    dom.timerLevelLabel.textContent = `⏱ GIỚI HẠN ${cfg.shortName.toUpperCase()}`;
+                }
 
                 const tick = () => {
-                    if (state.isTransitioning || state.mode !== 'survival' || state.isModalOpen) return;
+                    if (state.isTransitioning || state.isModalOpen || document.visibilityState === 'hidden') return;
                     const remain = Math.max(0, state.survivalEndTime - performance.now());
-                    const pct = (remain / durationMs) * 100;
+                    const pct = (remain / fullDurationMs) * 100;
                     dom.survivalBar.style.width = `${pct}%`;
                     dom.survivalTimeText.textContent = `${(remain / 1000).toFixed(1)}s`;
 
@@ -1804,13 +2118,21 @@
 
             function finishTestSession() {
                 if (!state.testSession) return;
-                const thresholds = APP_CONFIG.TEST_MODE;
+                const lvl4 = state.levelConfig.levels[4] || DEFAULT_LEVEL_CONFIG.levels[4];
+                const thresholds = {
+                    passAccuracyPct: lvl4.minAccuracyPct || 90,
+                    passAvgSec: lvl4.timeLimitSec || 15
+                };
                 const result = evaluateTestResult(state.testSession, thresholds);
                 state.lastTestResult = result;
 
-                // Lưu kết quả Test tốt nhất (ưu tiên PASS, hoặc accuracy cao hơn)
                 if (!state.bestTestLabel || result.isPass) {
                     state.bestTestLabel = result.label;
+                }
+                if (result.isPass) {
+                    state.completed = true;
+                    state.currentLevel = 4;
+                    renderLevelButtons();
                 }
                 updateStatsUI();
                 syncProgressNow();
@@ -1871,14 +2193,15 @@
             }
 
             function pickRandomTarget() {
-                if (state.mode === 'practice') {
+                const cfg = getCurrentLevelCfg();
+                const len = cfg.charLength || 1;
+
+                if (len === 1) {
                     if (state.focusWeakChars) {
                         return pickWeightedChar(state.weakChars, CONFIG.TRICKY_SINGLE);
                     }
                     return CONFIG.TRICKY_SINGLE[Math.floor(Math.random() * CONFIG.TRICKY_SINGLE.length)];
                 }
-
-                const len = state.mode === 'test' ? 6 : (parseInt(dom.lengthSelect.value, 10) || 6);
 
                 if (Math.random() < 0.45) {
                     const exactMatches = CONFIG.MAPLE_WORDS.filter(w => w.length === len);
@@ -1886,7 +2209,7 @@
                         return exactMatches[Math.floor(Math.random() * exactMatches.length)];
                     }
                     const baseWord = CONFIG.MAPLE_WORDS[Math.floor(Math.random() * CONFIG.MAPLE_WORDS.length)];
-                    if (baseWord.length > len) {
+                    if (baseWord.length >= len) {
                         return baseWord.slice(0, len);
                     }
                     let combined = baseWord;
@@ -1905,6 +2228,7 @@
 
             function generateNewCaptcha() {
                 stopSurvivalTimer();
+                state.pausedRemainingMs = 0;
                 state.isTransitioning = false;
                 state.isComposing = false;
                 state.jamoBuffer = [];
@@ -1920,12 +2244,15 @@
                 CaptchaRenderer.render();
                 updateHints();
                 updateTestProgressUI();
+                updateLevelProgressUI();
 
-                if (state.mode === 'survival' && !state.isModalOpen) {
-                    startSurvivalTimer();
-                }
                 if (!state.isModalOpen) {
-                    dom.input.focus();
+                    startSurvivalTimer();
+                    if (!isMobileViewport()) dom.input.focus();
+                } else {
+                    const cfg = getCurrentLevelCfg();
+                    dom.survivalBar.style.width = '100%';
+                    dom.survivalTimeText.textContent = `${Number(cfg.timeLimitSec || 15).toFixed(1)}s`;
                 }
             }
 
@@ -2042,24 +2369,35 @@
                 if (state.isTransitioning) return;
                 state.isTransitioning = true;
                 stopSurvivalTimer();
+                const cfg = getCurrentLevelCfg();
+                const limitMs = (cfg.timeLimitSec || 15) * 1000;
                 const typed = dom.input.value.trim();
                 state.combo = 0;
                 state.timeoutCount += 1;
                 state.weakChars = recordWeakness(state.weakChars, state.target, {
                     isError: true,
-                    elapsedMs: CONFIG.SURVIVAL_MAX_TIME * 1000
+                    elapsedMs: limitMs
                 });
+                if (state.mode === 'test' && state.testSession) {
+                    state.testSession.failedCount += 1;
+                    state.testSession.missedTargets.push(state.target);
+                    state.testSession.currentIndex += 1;
+                }
                 updateStatsUI();
                 logAttemptToDb({
                     isCorrect: false,
                     errorType: 'timeout',
                     typedInput: typed,
-                    elapsedMs: CONFIG.SURVIVAL_MAX_TIME * 1000
+                    elapsedMs: limitMs
                 });
                 SoundFX.wrong();
                 showOverlay('⏰ HẾT GIỜ!', `Đáp án: ${state.target}`, 'text-rose-400', CONFIG.TIMEOUT_DELAY_MS);
                 setTimeout(() => {
-                    generateNewCaptcha();
+                    if (state.mode === 'test' && state.testSession && state.testSession.currentIndex >= state.testSession.totalQuestions) {
+                        finishTestSession();
+                    } else {
+                        generateNewCaptcha();
+                    }
                 }, CONFIG.TIMEOUT_DELAY_MS);
             }
 
@@ -2104,34 +2442,38 @@
             }
 
             function setMode(mode) {
+                const targetLvl = MODE_TO_LEVEL[mode] || 1;
+                if (state.levelConfig.lockProgression && targetLvl > state.currentLevel) {
+                    const prevCfg = state.levelConfig.levels[targetLvl - 1];
+                    SoundFX.wrong();
+                    showOverlay(
+                        `🔒 CHƯA MỞ KHÓA LEVEL ${targetLvl}`,
+                        `Hoàn thành ${prevCfg.shortName} (${prevCfg.requiredSolved} mã • >=${prevCfg.minAccuracyPct}%) để mở khóa`,
+                        'text-amber-300',
+                        1400
+                    );
+                    return;
+                }
+
                 state.mode = mode;
-                ['practice', 'reflex', 'survival', 'test'].forEach((m) => {
-                    const btn = document.getElementById(`btn-mode-${m}`);
-                    if (btn) {
-                        btn.className = m === mode
-                            ? 'mode-btn px-2.5 py-1.5 rounded-lg font-bold transition-all bg-amber-500 text-slate-950'
-                            : 'mode-btn px-2.5 py-1.5 rounded-lg font-medium transition-all text-slate-400 hover:text-white';
-                    }
-                    const mBtn = document.getElementById(`btn-mode-mobile-${m}`);
-                    if (mBtn) {
-                        mBtn.className = m === mode
-                            ? 'py-1.5 px-1 rounded-lg font-bold text-center truncate transition-all bg-amber-500 text-slate-950'
-                            : 'py-1.5 px-1 rounded-lg font-medium text-center truncate transition-all text-slate-400';
-                    }
-                });
+                renderLevelButtons();
 
                 const isTest = mode === 'test';
-                dom.survivalWrap.classList.toggle('hidden', mode !== 'survival');
+                const cfg = getCurrentLevelCfg();
+                dom.survivalWrap.classList.remove('hidden');
                 dom.testProgressWrap.classList.toggle('hidden', !isTest);
                 dom.weakFocusWrap.classList.toggle('hidden', mode !== 'practice');
 
-                dom.lengthSelect.disabled = (mode === 'practice' || isTest);
-                dom.lengthSelect.classList.toggle('opacity-50', mode === 'practice' || isTest);
+                // Khóa số ký tự đúng theo Level (Lv.1=1, Lv.2=3, Lv.3=6, Lv.4=6) để thước đo tốc độ công bằng
+                dom.lengthSelect.disabled = true;
+                dom.lengthSelect.classList.add('opacity-60');
+                dom.lengthSelect.innerHTML = `<option value="${cfg.charLength}" selected>${cfg.charLength} ký tự (${cfg.shortName})</option>`;
+
                 dom.difficulty.disabled = isTest;
                 dom.difficulty.classList.toggle('opacity-50', isTest);
 
-                dom.toggleHints.disabled = (mode === 'survival' || isTest);
-                if (mode === 'survival' || isTest) {
+                dom.toggleHints.disabled = !cfg.allowHints;
+                if (!cfg.allowHints) {
                     dom.toggleHints.checked = false;
                 }
 
@@ -2140,6 +2482,7 @@
                 dom.btnSkip.title = isTest ? 'Bỏ qua mã này (tính sai)' : 'Đổi mã khác';
 
                 renderWeakCharsBar();
+                updateLevelProgressUI();
 
                 if (isTest) {
                     startTestMode();
@@ -2332,6 +2675,15 @@
                 if (document.fonts && document.fonts.ready) {
                     document.fonts.ready.then(() => CaptchaRenderer.render());
                 }
+
+                // Tạm dừng đồng hồ đếm ngược khi người dùng chuyển tab / khóa màn hình để không bị tính giờ AFK
+                document.addEventListener('visibilitychange', () => {
+                    if (document.visibilityState === 'hidden') {
+                        pauseTimer();
+                    } else if (!state.isModalOpen && state.playerName) {
+                        resumeTimer();
+                    }
+                });
             }
 
             async function init() {
@@ -2341,7 +2693,6 @@
                 state.focusWeakChars = prefs.focusWeakChars !== false;
                 dom.toggleWeakFocus.checked = state.focusWeakChars;
                 if (prefs.difficulty) dom.difficulty.value = prefs.difficulty;
-                if (prefs.length) dom.lengthSelect.value = prefs.length;
 
                 VirtualKeyboard.init(handleDirectKey);
                 bindEvents();
@@ -2352,23 +2703,21 @@
                     renderManagerBoard();
                 });
 
+                if (result.levelConfig) {
+                    applyLevelConfig(result.levelConfig);
+                } else {
+                    renderLevelButtons();
+                }
+
                 if (result.profile && result.profile.name) {
-                    state.playerName = result.profile.name;
-                    state.solved = result.profile.solved || 0;
-                    state.bestCombo = result.profile.bestCombo || 0;
-                    state.totalTimeMs = result.profile.totalTimeMs || 0;
-                    state.wrongCount = result.profile.wrongCount || 0;
-                    state.revealCount = result.profile.revealCount || 0;
-                    state.timeoutCount = result.profile.timeoutCount || 0;
-                    state.dailyStats = result.profile.dailyStats || {};
-                    state.weakChars = result.profile.weakChars || {};
-                    state.bestTestLabel = result.profile.bestTestLabel || '';
+                    applyLoadedProfile(result.profile);
                     dom.nameModal.classList.add('hidden');
                     state.isModalOpen = false;
                     updateStatsUI();
-                    setMode('reflex');
+                    renderLevelButtons();
+                    setMode(LEVEL_TO_MODE[state.currentLevel] || 'practice');
                 } else {
-                    setMode('reflex');
+                    setMode('practice');
                     openNameModal(false);
                 }
             }
@@ -2407,6 +2756,9 @@
                 closeMemberDetail,
                 resetSelectedMemberPin,
                 resetSelectedMember,
+                saveAdminSettings,
+                resetTodayData,
+                setMemberLevelFromAdmin,
                 copyTeamReport,
                 downloadTeamCsv
             };
