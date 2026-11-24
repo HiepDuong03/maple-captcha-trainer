@@ -1,25 +1,25 @@
 /**
- * Local dev server chạy cả Frontend static + 4 Vercel API endpoints (/api/*) trên 1 cổng duy nhất.
- * Giúp test 100% giống môi trường Vercel ngay trên máy cá nhân với SQLite local (file:./data/trainer.db)
- * hoặc Turso cloud (nếu điền TURSO_DATABASE_URL trong .env).
+ * Local dev server chạy cả Frontend static (public/) + 4 Vercel API endpoints (/api/*) trên 1 cổng duy nhất.
+ * Được đặt trong scripts/ để Vercel không nhận nhầm làm production server entrypoint.
  */
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import playerHandler from './api/player.js';
-import attemptHandler from './api/attempt.js';
-import testSessionHandler from './api/test-session.js';
-import adminHandler from './api/admin.js';
-import { resolveDbConfig } from './lib/db.js';
+import playerHandler from '../api/player.js';
+import attemptHandler from '../api/attempt.js';
+import testSessionHandler from '../api/test-session.js';
+import adminHandler from '../api/admin.js';
+import { resolveDbConfig } from '../lib/db.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const PROJECT_ROOT = path.resolve(__dirname, '..');
+const PUBLIC_DIR = path.join(PROJECT_ROOT, 'public');
 const PORT = Number(process.env.PORT || 8090);
 
-// Nạp .env cục bộ nếu có (không cần thêm thư viện ngoài)
 function loadLocalEnv() {
-    const envPath = path.join(__dirname, '.env');
+    const envPath = path.join(PROJECT_ROOT, '.env');
     if (!fs.existsSync(envPath)) return;
     const lines = fs.readFileSync(envPath, 'utf-8').split(/\r?\n/);
     for (const line of lines) {
@@ -60,22 +60,9 @@ const server = http.createServer(async (req, res) => {
         return;
     }
 
-    // Chặn truy cập trực tiếp vào file nhạy cảm (.env, data/, lib/, server.mjs)
-    if (
-        pathname.startsWith('/data/') ||
-        pathname.startsWith('/lib/') ||
-        pathname.startsWith('/api/') ||
-        pathname === '/.env' ||
-        pathname === '/server.mjs'
-    ) {
-        res.writeHead(403);
-        res.end('Forbidden');
-        return;
-    }
-
     const relPath = pathname === '/' ? 'index.html' : pathname.replace(/^\/+/, '');
-    const fullPath = path.resolve(__dirname, relPath);
-    if (!fullPath.startsWith(__dirname)) {
+    const fullPath = path.resolve(PUBLIC_DIR, relPath);
+    if (!fullPath.startsWith(PUBLIC_DIR)) {
         res.writeHead(403);
         res.end('Forbidden');
         return;

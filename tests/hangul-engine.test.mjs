@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { HangulEngine } from '../js/hangul-engine.js';
+import { HangulEngine } from '../public/js/hangul-engine.js';
 
 test('assembles basic Hangul syllable from QWERTY keys (r, k, d -> 강)', () => {
     const jamos = ['r', 'k', 'd'].map((k) => HangulEngine.mapKeyToJamo(k));

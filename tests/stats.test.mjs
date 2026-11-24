@@ -11,7 +11,7 @@ import {
     exportTeamCsv,
     classifyMemberAndRecommend,
     formatCoachingDiscordReport
-} from '../js/stats.js';
+} from '../public/js/stats.js';
 
 test('getTodayKey formats local date as YYYY-MM-DD', () => {
     const d = new Date(2026, 10, 5); // 2026-11-05
