@@ -277,7 +277,7 @@ test('4-Level progression, Admin timer settings, AFK outlier capping, and Reset 
     delete process.env.ADMIN_PIN;
     resetDbClientForTest();
 
-    // 1. Admin configures Lv.1 to 6s / 2 solved to pass
+    // 1. Admin configures Lv.1 to 6s / 2 solved / minDifficulty='hard', and Lv.2 to 500 solved (>200 allowed!)
     const setRes = createMockRes();
     await adminHandler({
         method: 'PATCH',
@@ -286,8 +286,8 @@ test('4-Level progression, Admin timer settings, AFK outlier capping, and Reset 
             levelConfig: {
                 lockProgression: true,
                 levels: {
-                    1: { timeLimitSec: 6, requiredSolved: 2, minAccuracyPct: 90 },
-                    2: { timeLimitSec: 15, requiredSolved: 2, minAccuracyPct: 90 }
+                    1: { timeLimitSec: 6, requiredSolved: 2, minAccuracyPct: 90, minDifficulty: 'hard' },
+                    2: { timeLimitSec: 15, requiredSolved: 500, minAccuracyPct: 90, minDifficulty: 'medium' }
                 }
             }
         },
@@ -295,28 +295,41 @@ test('4-Level progression, Admin timer settings, AFK outlier capping, and Reset 
     }, setRes);
     assert.equal(setRes.result.statusCode, 200);
     assert.equal(setRes.result.body.levelConfig.levels[1].timeLimitSec, 6);
-    assert.equal(setRes.result.body.levelConfig.levels[2].timeLimitSec, 15);
+    assert.equal(setRes.result.body.levelConfig.levels[1].minDifficulty, 'hard');
+    assert.equal(setRes.result.body.levelConfig.levels[2].requiredSolved, 500);
 
-    // 2. Register player & submit 2 Lv.1 attempts (1st has huge AFK 142720ms -> must be capped to 6000ms!)
+    // 2. Register player & submit easy attempt (should NOT count toward Lv.1 with minDifficulty='hard')
     const reg = createMockRes();
     await playerHandler({ method: 'POST', body: { action: 'login', name: 'Phương', pin: '1111' }, headers: {} }, reg);
     const uid = reg.result.body.profile.userId;
 
+    const aEasy = createMockRes();
+    await attemptHandler({
+        method: 'POST',
+        body: { userId: uid, name: 'Phương', mode: 'practice', difficulty: 'easy', target: '가', typedInput: '가', isCorrect: true, elapsedMs: 1500 },
+        headers: {}
+    }, aEasy);
+    assert.equal(aEasy.result.body.levelProgress[1].solved, 0);
+    assert.equal(aEasy.result.body.currentLevel, 1);
+
+    // Submit 2 qualifying 'hard' attempts (1st has AFK 142720ms -> capped to 6000ms)
     const a1 = createMockRes();
     await attemptHandler({
         method: 'POST',
-        body: { userId: uid, name: 'Phương', mode: 'practice', target: '가', typedInput: '가', isCorrect: true, elapsedMs: 142720 },
+        body: { userId: uid, name: 'Phương', mode: 'practice', difficulty: 'hard', target: '가', typedInput: '가', isCorrect: true, elapsedMs: 142720 },
         headers: {}
     }, a1);
-    assert.equal(a1.result.body.summary.totalTimeMs, 6000); // capped at Lv.1 timeLimitSec (6s)
+    assert.equal(a1.result.body.summary.totalTimeMs, 7500); // 1500 + capped 6000
+    assert.equal(a1.result.body.levelProgress[1].solved, 1);
     assert.equal(a1.result.body.currentLevel, 1);
 
     const a2 = createMockRes();
     await attemptHandler({
         method: 'POST',
-        body: { userId: uid, name: 'Phương', mode: 'practice', target: '나', typedInput: '나', isCorrect: true, elapsedMs: 2000 },
+        body: { userId: uid, name: 'Phương', mode: 'practice', difficulty: 'hard', target: '나', typedInput: '나', isCorrect: true, elapsedMs: 2000 },
         headers: {}
     }, a2);
+    assert.equal(a2.result.body.levelProgress[1].solved, 2);
     assert.equal(a2.result.body.currentLevel, 2);
     assert.equal(a2.result.body.leveledUp, true);
 

@@ -981,12 +981,18 @@
             const DEFAULT_LEVEL_CONFIG = {
                 lockProgression: true,
                 levels: {
-                    1: { level: 1, mode: 'practice', name: 'Lv.1: Tập Phím', shortName: 'Lv.1 (1 chữ)', mobileName: 'Lv.1 (1c)', charLength: 1, timeLimitSec: 8, requiredSolved: 20, minAccuracyPct: 90, allowHints: true },
-                    2: { level: 2, mode: 'reflex', name: 'Lv.2: Phản Xạ', shortName: 'Lv.2 (3 chữ)', mobileName: 'Lv.2 (3c)', charLength: 3, timeLimitSec: 18, requiredSolved: 20, minAccuracyPct: 90, allowHints: true },
-                    3: { level: 3, mode: 'survival', name: 'Lv.3: Sinh Tồn', shortName: 'Lv.3 (6 chữ)', mobileName: 'Lv.3 (6c)', charLength: 6, timeLimitSec: 35, requiredSolved: 15, minAccuracyPct: 90, allowHints: false },
-                    4: { level: 4, mode: 'test', name: 'Lv.4: Thi Test', shortName: 'Lv.4 (Thi)', mobileName: 'Lv.4 (Thi)', charLength: 6, timeLimitSec: 15, requiredSolved: 10, minAccuracyPct: 90, allowHints: false }
+                    1: { level: 1, mode: 'practice', name: 'Lv.1: Tập Phím', shortName: 'Lv.1 (1 chữ)', mobileName: 'Lv.1 (1c)', charLength: 1, timeLimitSec: 8, requiredSolved: 20, minAccuracyPct: 90, minDifficulty: 'easy', allowHints: true },
+                    2: { level: 2, mode: 'reflex', name: 'Lv.2: Phản Xạ', shortName: 'Lv.2 (3 chữ)', mobileName: 'Lv.2 (3c)', charLength: 3, timeLimitSec: 18, requiredSolved: 20, minAccuracyPct: 90, minDifficulty: 'medium', allowHints: true },
+                    3: { level: 3, mode: 'survival', name: 'Lv.3: Sinh Tồn', shortName: 'Lv.3 (6 chữ)', mobileName: 'Lv.3 (6c)', charLength: 6, timeLimitSec: 35, requiredSolved: 15, minAccuracyPct: 90, minDifficulty: 'medium', allowHints: false },
+                    4: { level: 4, mode: 'test', name: 'Lv.4: Thi Test', shortName: 'Lv.4 (Thi)', mobileName: 'Lv.4 (Thi)', charLength: 6, timeLimitSec: 15, requiredSolved: 10, minAccuracyPct: 90, minDifficulty: 'medium', allowHints: false }
                 }
             };
+            const DIFF_RANK = { easy: 1, medium: 2, hard: 3 };
+            function formatMinDiffLabel(d) {
+                if (d === 'hard') return 'Ác Mộng';
+                if (d === 'medium') return 'Chuẩn In-Game+';
+                return 'Dễ+';
+            }
             const MODE_TO_LEVEL = { practice: 1, reflex: 2, survival: 3, test: 4 };
             const LEVEL_TO_MODE = { 1: 'practice', 2: 'reflex', 3: 'survival', 4: 'test' };
 
@@ -1210,7 +1216,7 @@
                 const pct = Math.min(100, Math.round((prog.solved / Math.max(1, cfg.requiredSolved)) * 100));
                 const doneBadge = prog.passed || lvl < state.currentLevel ? ' • ✅ Đã qua màn' : '';
                 dom.levelProgressLabel.textContent = `Tiến độ ${cfg.shortName}: ${prog.solved}/${cfg.requiredSolved} mã${doneBadge}`;
-                dom.levelProgressMeta.textContent = `Acc ${prog.accuracyPct}% (cần >=${cfg.minAccuracyPct}%) • ${cfg.timeLimitSec}s/mã`;
+                dom.levelProgressMeta.textContent = `Acc ${prog.accuracyPct}% (cần >=${cfg.minAccuracyPct}% • ${formatMinDiffLabel(cfg.minDifficulty)} • ${cfg.timeLimitSec}s/mã)`;
                 dom.levelProgressBar.style.width = `${pct}%`;
             }
 
@@ -1593,23 +1599,32 @@
                 const rows = [1, 2, 3, 4].map((lvl) => {
                     const c = cfg.levels[lvl];
                     const reqLabel = lvl === 4 ? 'Số câu thi' : 'Số mã qua màn';
+                    const md = c.minDifficulty || 'easy';
                     return `
-                        <div class="bg-slate-950/80 border border-slate-800 rounded-xl p-3 grid grid-cols-1 sm:grid-cols-4 gap-2 items-center">
-                            <div>
+                        <div class="bg-slate-950/80 border border-slate-800 rounded-xl p-3 grid grid-cols-2 sm:grid-cols-5 gap-2 items-center">
+                            <div class="col-span-2 sm:col-span-1">
                                 <div class="text-xs font-extrabold text-white">${escapeHtml(c.shortName)}</div>
-                                <div class="text-[10px] text-slate-400">${c.charLength} ký tự • ${c.allowHints ? 'Cho phép gợi ý' : 'Tắt gợi ý'}</div>
+                                <div class="text-[10px] text-slate-400">${c.charLength} ký tự • ${c.allowHints ? 'Có gợi ý' : 'Tắt gợi ý'}</div>
                             </div>
                             <label class="text-[11px] text-slate-300 flex flex-col gap-1">
-                                <span>Giới hạn giây / mã</span>
-                                <input type="number" min="3" max="120" id="cfg-sec-${lvl}" value="${c.timeLimitSec}" class="bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs font-bold text-amber-300 focus:outline-none focus:border-amber-500">
+                                <span>Giây / mã</span>
+                                <input type="number" min="3" max="180" id="cfg-sec-${lvl}" value="${c.timeLimitSec}" class="bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs font-bold text-amber-300 focus:outline-none focus:border-amber-500">
                             </label>
                             <label class="text-[11px] text-slate-300 flex flex-col gap-1">
                                 <span>${reqLabel}</span>
-                                <input type="number" min="1" max="200" id="cfg-req-${lvl}" value="${c.requiredSolved}" class="bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs font-bold text-emerald-300 focus:outline-none focus:border-amber-500">
+                                <input type="number" min="1" max="10000" id="cfg-req-${lvl}" value="${c.requiredSolved}" class="bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs font-bold text-emerald-300 focus:outline-none focus:border-amber-500">
                             </label>
                             <label class="text-[11px] text-slate-300 flex flex-col gap-1">
-                                <span>Chính xác tối thiểu (%)</span>
+                                <span>Chính xác (%)</span>
                                 <input type="number" min="50" max="100" id="cfg-acc-${lvl}" value="${c.minAccuracyPct}" class="bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs font-bold text-sky-300 focus:outline-none focus:border-amber-500">
+                            </label>
+                            <label class="text-[11px] text-slate-300 flex flex-col gap-1 col-span-2 sm:col-span-1">
+                                <span>Độ khó tối thiểu</span>
+                                <select id="cfg-diff-${lvl}" class="bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-xs font-bold text-rose-300 focus:outline-none focus:border-amber-500">
+                                    <option value="easy" ${md === 'easy' ? 'selected' : ''}>Dễ trở lên</option>
+                                    <option value="medium" ${md === 'medium' ? 'selected' : ''}>Chuẩn In-Game+</option>
+                                    <option value="hard" ${md === 'hard' ? 'selected' : ''}>Bắt buộc Ác Mộng</option>
+                                </select>
                             </label>
                         </div>
                     `;
@@ -1656,7 +1671,8 @@
                         ...state.levelConfig.levels[lvl],
                         timeLimitSec: Number(document.getElementById(`cfg-sec-${lvl}`)?.value || state.levelConfig.levels[lvl].timeLimitSec),
                         requiredSolved: Number(document.getElementById(`cfg-req-${lvl}`)?.value || state.levelConfig.levels[lvl].requiredSolved),
-                        minAccuracyPct: Number(document.getElementById(`cfg-acc-${lvl}`)?.value || state.levelConfig.levels[lvl].minAccuracyPct)
+                        minAccuracyPct: Number(document.getElementById(`cfg-acc-${lvl}`)?.value || state.levelConfig.levels[lvl].minAccuracyPct),
+                        minDifficulty: String(document.getElementById(`cfg-diff-${lvl}`)?.value || state.levelConfig.levels[lvl].minDifficulty || 'easy')
                     };
                 }
                 const res = await StorageService.updateLevelSettings(nextCfg);
@@ -2239,7 +2255,10 @@
                 state.targetJamos = HangulEngine.decomposeString(state.target);
                 state.questionStartTime = performance.now();
 
-                const diff = state.mode === 'test' ? 'medium' : dom.difficulty.value;
+                const cfg = getCurrentLevelCfg();
+                const minDiff = cfg.minDifficulty || 'easy';
+                const diff = state.mode === 'test' ? minDiff : (DIFF_RANK[dom.difficulty.value] < DIFF_RANK[minDiff] ? minDiff : dom.difficulty.value);
+                if (dom.difficulty.value !== diff) dom.difficulty.value = diff;
                 CaptchaRenderer.createSpec(state.target, diff);
                 CaptchaRenderer.render();
                 updateHints();
@@ -2469,8 +2488,17 @@
                 dom.lengthSelect.classList.add('opacity-60');
                 dom.lengthSelect.innerHTML = `<option value="${cfg.charLength}" selected>${cfg.charLength} ký tự (${cfg.shortName})</option>`;
 
-                dom.difficulty.disabled = isTest;
-                dom.difficulty.classList.toggle('opacity-50', isTest);
+                // Khóa độ khó tối thiểu đúng theo yêu cầu qua màn của Level (tránh hạ xuống Dễ để cày vượt cấp)
+                const minDiff = cfg.minDifficulty || 'easy';
+                const minRank = DIFF_RANK[minDiff] || 1;
+                Array.from(dom.difficulty.options).forEach((opt) => {
+                    opt.disabled = (DIFF_RANK[opt.value] || 1) < minRank;
+                });
+                if ((DIFF_RANK[dom.difficulty.value] || 1) < minRank || isTest) {
+                    dom.difficulty.value = minDiff;
+                }
+                dom.difficulty.disabled = isTest || minDiff === 'hard';
+                dom.difficulty.classList.toggle('opacity-50', isTest || minDiff === 'hard');
 
                 dom.toggleHints.disabled = !cfg.allowHints;
                 if (!cfg.allowHints) {
