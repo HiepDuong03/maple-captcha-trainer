@@ -1502,6 +1502,7 @@
                 }
 
                 const myUid = StorageService.getUserId();
+                const canDelete = Boolean(state.adminData?.adminUnlocked);
                 dom.mgrListContainer.innerHTML = filtered.map((m) => {
                     const isMe = m.userId === myUid;
                     const speedText = m.solved > 0 ? `${Number(m.avgTimeSec).toFixed(1)}s` : '--';
@@ -1525,19 +1526,22 @@
                                     <div class="text-[10px] text-slate-500 mt-0.5">${formatRelativeTime(m.lastActiveAt)} • Bấm xem lỗi chi tiết →</div>
                                 </div>
 
-                                <div class="grid grid-cols-3 gap-1.5 shrink-0 text-center">
-                                    <div class="bg-slate-900 border border-slate-800 rounded-lg px-2 py-1">
-                                        <div class="text-[9px] text-slate-400">HN / Tổng</div>
-                                        <div class="text-xs font-extrabold text-white"><span class="text-amber-300">${m.todayVal}</span>/${m.solved || 0}</div>
+                                <div class="flex items-center gap-1.5 shrink-0">
+                                    <div class="grid grid-cols-3 gap-1.5 text-center">
+                                        <div class="bg-slate-900 border border-slate-800 rounded-lg px-2 py-1">
+                                            <div class="text-[9px] text-slate-400">HN / Tổng</div>
+                                            <div class="text-xs font-extrabold text-white"><span class="text-amber-300">${m.todayVal}</span>/${m.solved || 0}</div>
+                                        </div>
+                                        <div class="bg-slate-900 border border-slate-800 rounded-lg px-2 py-1">
+                                            <div class="text-[9px] text-slate-400">Chính xác</div>
+                                            <div class="text-xs font-extrabold text-violet-300">${acc}%</div>
+                                        </div>
+                                        <div class="bg-slate-900 border border-slate-800 rounded-lg px-2 py-1">
+                                            <div class="text-[9px] text-slate-400">TB/mã</div>
+                                            <div class="text-xs font-extrabold text-sky-400">${speedText}</div>
+                                        </div>
                                     </div>
-                                    <div class="bg-slate-900 border border-slate-800 rounded-lg px-2 py-1">
-                                        <div class="text-[9px] text-slate-400">Chính xác</div>
-                                        <div class="text-xs font-extrabold text-violet-300">${acc}%</div>
-                                    </div>
-                                    <div class="bg-slate-900 border border-slate-800 rounded-lg px-2 py-1">
-                                        <div class="text-[9px] text-slate-400">TB/mã</div>
-                                        <div class="text-xs font-extrabold text-sky-400">${speedText}</div>
-                                    </div>
+                                    ${canDelete ? `<button type="button" onclick="App.deleteMemberQuick(event, '${escapeHtml(m.userId)}', this)" title="Xóa tài khoản này" class="px-2 py-2 rounded-lg bg-rose-500/15 hover:bg-rose-500/30 border border-rose-500/35 text-rose-300 text-xs font-bold transition-colors">🗑</button>` : ''}
                                 </div>
                             </div>
 
@@ -1981,6 +1985,31 @@
                     const prev = dom.btnResetPin.textContent;
                     dom.btnResetPin.textContent = '✔ Đã xóa PIN cũ!';
                     setTimeout(() => { dom.btnResetPin.textContent = prev; }, 2000);
+                }
+            }
+
+            async function deleteMemberQuick(event, playerId, btnEl) {
+                if (event) event.stopPropagation();
+                if (!playerId) return;
+                if (btnEl && btnEl.dataset.armed !== '1') {
+                    btnEl.dataset.armed = '1';
+                    btnEl.textContent = 'Xóa?';
+                    btnEl.classList.add('bg-rose-600', 'text-white');
+                    setTimeout(() => {
+                        if (btnEl && btnEl.isConnected) {
+                            btnEl.dataset.armed = '0';
+                            btnEl.textContent = '🗑';
+                            btnEl.classList.remove('bg-rose-600', 'text-white');
+                        }
+                    }, 3500);
+                    return;
+                }
+                const res = await StorageService.resetAdminData({
+                    scope: 'player',
+                    playerId
+                });
+                if (res && res.ok) {
+                    await refreshAdminDashboard();
                 }
             }
 
@@ -2810,6 +2839,7 @@
                 openMemberDetail,
                 closeMemberDetail,
                 resetSelectedMemberPin,
+                deleteMemberQuick,
                 resetSelectedMember,
                 saveAdminSettings,
                 resetTodayData,
