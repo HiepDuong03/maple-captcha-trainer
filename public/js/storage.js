@@ -194,6 +194,18 @@ export const StorageService = (() => {
         if (onTeamUpdateCb) onTeamUpdateCb(teamRecords);
     }
 
+    async function pingPresence() {
+        if (!userId) return;
+        try {
+            await apiFetch('/api/player', {
+                method: 'POST',
+                body: JSON.stringify({ action: 'ping', userId })
+            });
+        } catch {
+            // Bỏ qua lỗi mạng tạm thời
+        }
+    }
+
     async function savePlayerStats(payload) {
         const record = buildLocalRecord(payload);
         updateLocalCache(record, payload);
@@ -382,6 +394,7 @@ export const StorageService = (() => {
         init,
         loginWithNameAndPin,
         logout,
+        pingPresence,
         savePlayerStats,
         recordAttempt,
         recordTestSession,

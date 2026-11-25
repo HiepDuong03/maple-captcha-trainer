@@ -1395,6 +1395,20 @@
                 if (!isMobileViewport()) dom.input.focus();
             }
 
+            function formatExactTime(ts) {
+                if (!ts) return '';
+                const d = new Date(ts);
+                const hh = String(d.getHours()).padStart(2, '0');
+                const mm = String(d.getMinutes()).padStart(2, '0');
+                const dd = String(d.getDate()).padStart(2, '0');
+                const mo = String(d.getMonth() + 1).padStart(2, '0');
+                return `${hh}:${mm} ${dd}/${mo}`;
+            }
+
+            function isMemberOnline(lastActiveAt) {
+                return Boolean(lastActiveAt && (Date.now() - Number(lastActiveAt) <= 120000));
+            }
+
             function formatRelativeTime(ts) {
                 if (!ts) return 'Chưa có';
                 const diffSec = Math.max(0, Math.floor((Date.now() - ts) / 1000));
@@ -1488,8 +1502,9 @@
                     });
 
                 const totalToday = enriched.reduce((sum, m) => sum + m.todayVal, 0);
+                const onlineCount = enriched.filter((m) => isMemberOnline(m.lastActiveAt)).length;
                 if (dom.mgrSummaryChip) {
-                    dom.mgrSummaryChip.textContent = `${filtered.length}/${records.length} người • Hôm nay: ${totalToday} mã`;
+                    dom.mgrSummaryChip.innerHTML = `<span class="text-emerald-400 font-bold">🟢 ${onlineCount} online</span> • ${filtered.length}/${records.length} người • HN: ${totalToday} mã`;
                 }
 
                 if (filtered.length === 0) {
@@ -1505,6 +1520,10 @@
                 const canDelete = Boolean(state.adminData?.adminUnlocked);
                 dom.mgrListContainer.innerHTML = filtered.map((m) => {
                     const isMe = m.userId === myUid;
+                    const online = isMemberOnline(m.lastActiveAt);
+                    const presenceHtml = online
+                        ? `<span class="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-400"><span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>Đang online</span>`
+                        : `<span class="inline-flex items-center gap-1 text-[10px] text-slate-400"><span class="w-1.5 h-1.5 rounded-full bg-slate-600"></span>Online lần cuối: ${formatRelativeTime(m.lastActiveAt)}${m.lastActiveAt ? ` (${formatExactTime(m.lastActiveAt)})` : ''}</span>`;
                     const speedText = m.solved > 0 ? `${Number(m.avgTimeSec).toFixed(1)}s` : '--';
                     const acc = Number(m.accuracyPct ?? 100);
                     const tierStyles = m.assessment.tier === 'pass'
@@ -1523,7 +1542,10 @@
                                         ${isMe ? '<span class="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-amber-300 font-semibold">Bạn</span>' : ''}
                                         ${m.bestTestLabel ? `<span class="text-[10px] px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-200 font-semibold">${escapeHtml(m.bestTestLabel)}</span>` : ''}
                                     </div>
-                                    <div class="text-[10px] text-slate-500 mt-0.5">${formatRelativeTime(m.lastActiveAt)} • Bấm xem lỗi chi tiết →</div>
+                                    <div class="flex items-center gap-2 flex-wrap mt-0.5">
+                                        ${presenceHtml}
+                                        <span class="text-[10px] text-slate-500">• Bấm xem chi tiết →</span>
+                                    </div>
                                 </div>
 
                                 <div class="flex items-center gap-1.5 shrink-0">
@@ -2025,6 +2047,8 @@
                 }
             }
 
+            let adminRefreshTimerId = null;
+
             function openManagerModal() {
                 state.isModalOpen = true;
                 pauseTimer();
@@ -2033,9 +2057,17 @@
                 closeMemberDetail();
                 setAdminTab(state.adminTab || 'overview');
                 refreshAdminDashboard();
+                clearInterval(adminRefreshTimerId);
+                adminRefreshTimerId = setInterval(() => {
+                    if (!dom.managerModal.classList.contains('hidden')) {
+                        refreshAdminDashboard();
+                    }
+                }, 30000);
             }
 
             function closeManagerModal() {
+                clearInterval(adminRefreshTimerId);
+                adminRefreshTimerId = null;
                 dom.managerModal.classList.add('hidden');
                 state.isModalOpen = false;
                 if (state.playerName) {
@@ -2764,10 +2796,18 @@
                 document.addEventListener('visibilitychange', () => {
                     if (document.visibilityState === 'hidden') {
                         pauseTimer();
-                    } else if (!state.isModalOpen && state.playerName) {
-                        resumeTimer();
+                    } else if (state.playerName) {
+                        StorageService.pingPresence();
+                        if (!state.isModalOpen) resumeTimer();
                     }
                 });
+
+                // Heartbeat nhẹ mỗi 60 giây khi tab đang mở để Admin thấy trạng thái Online realtime
+                setInterval(() => {
+                    if (document.visibilityState === 'visible' && state.playerName) {
+                        StorageService.pingPresence();
+                    }
+                }, 60000);
             }
 
             async function init() {

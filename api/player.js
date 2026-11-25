@@ -104,6 +104,21 @@ export default async function handler(req, res) {
             const body = await readJsonBody(req);
             const now = Date.now();
 
+            // Heartbeat nhẹ mỗi 60s khi tab đang mở để Admin biết ai đang online
+            if (body.action === 'ping') {
+                const pid = String(body.userId || '').trim();
+                if (!pid) {
+                    sendJson(res, 400, { ok: false, error: 'Missing userId' });
+                    return;
+                }
+                await db.execute({
+                    sql: 'UPDATE players SET last_active_at = ? WHERE id = ?',
+                    args: [now, pid]
+                });
+                sendJson(res, 200, { ok: true, lastActiveAt: now });
+                return;
+            }
+
             if (body.action === 'login') {
                 const cleanName = String(body.name || '').trim().replace(/\s+/g, ' ').slice(0, 32);
                 const pin = String(body.pin || '').trim();
