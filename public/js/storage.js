@@ -245,6 +245,9 @@ export const StorageService = (() => {
             if (resp.status === 200 && resp.data?.ok) {
                 return resp.data;
             }
+            if (resp.status === 403 && resp.data?.code === 'LEVEL_LOCKED') {
+                return resp.data;
+            }
             return null;
         } catch {
             return null;

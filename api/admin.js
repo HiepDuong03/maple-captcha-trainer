@@ -1,23 +1,26 @@
 import { getDb, resolveDbConfig } from '../lib/db.js';
 import { getDayKey, getRangeStartTs } from '../lib/mistakes.js';
-import { getLevelConfig, saveLevelConfig, computePlayerLevelProgress } from '../lib/levels.js';
+import { getLevelConfig, saveLevelConfig, computePlayerLevelProgress, isDifficultyQualifying } from '../lib/levels.js';
 import { sendJson, readJsonBody, getQueryParams, checkAdminAuth } from '../lib/http.js';
 
-async function resyncPlayersFromLogs(db) {
+async function resyncPlayersFromLogs(db, levelConfig) {
     const playersRes = await db.execute('SELECT id FROM players');
     for (const row of playersRes.rows) {
         const pid = String(row.id);
-        const aggRes = await db.execute({
-            sql: `SELECT
-                    SUM(CASE WHEN is_correct = 1 THEN 1 ELSE 0 END) AS solved_cnt,
-                    SUM(CASE WHEN is_correct = 0 AND error_type IN ('wrong', 'skip') THEN 1 ELSE 0 END) AS wrong_cnt,
-                    SUM(CASE WHEN is_correct = 0 AND error_type = 'reveal' THEN 1 ELSE 0 END) AS reveal_cnt,
-                    SUM(CASE WHEN is_correct = 0 AND error_type = 'timeout' THEN 1 ELSE 0 END) AS timeout_cnt,
-                    SUM(CASE WHEN is_correct = 1 THEN MIN(elapsed_ms, 60000) ELSE 0 END) AS clean_time_ms
-                  FROM attempt_logs
-                  WHERE player_id = ?`,
-            args: [pid]
-        });
+        const [aggRes, levelInfo] = await Promise.all([
+            db.execute({
+                sql: `SELECT
+                        SUM(CASE WHEN is_correct = 1 THEN 1 ELSE 0 END) AS solved_cnt,
+                        SUM(CASE WHEN is_correct = 0 AND error_type IN ('wrong', 'skip') THEN 1 ELSE 0 END) AS wrong_cnt,
+                        SUM(CASE WHEN is_correct = 0 AND error_type = 'reveal' THEN 1 ELSE 0 END) AS reveal_cnt,
+                        SUM(CASE WHEN is_correct = 0 AND error_type = 'timeout' THEN 1 ELSE 0 END) AS timeout_cnt,
+                        SUM(CASE WHEN is_correct = 1 THEN MIN(elapsed_ms, 60000) ELSE 0 END) AS clean_time_ms
+                      FROM attempt_logs
+                      WHERE player_id = ?`,
+                args: [pid]
+            }),
+            computePlayerLevelProgress(db, pid, levelConfig)
+        ]);
         const a = aggRes.rows[0] || {};
         const solved = Number(a.solved_cnt || 0);
         const wrongCount = Number(a.wrong_cnt || 0);
@@ -28,9 +31,10 @@ async function resyncPlayersFromLogs(db) {
         const cleanTime = Number(a.clean_time_ms || 0);
         await db.execute({
             sql: `UPDATE players
-                  SET solved = ?, total_time_ms = ?, wrong_count = ?, reveal_count = ?, timeout_count = ?, accuracy_pct = ?
+                  SET solved = ?, total_time_ms = ?, wrong_count = ?, reveal_count = ?, timeout_count = ?,
+                      accuracy_pct = ?, current_level = ?, completed_at = ?
                   WHERE id = ?`,
-            args: [solved, cleanTime, wrongCount, revealCount, timeoutCount, acc, pid]
+            args: [solved, cleanTime, wrongCount, revealCount, timeoutCount, acc, levelInfo.computedLevel, levelInfo.completedAt, pid]
         });
     }
 }
@@ -86,7 +90,8 @@ export default async function handler(req, res) {
                     { sql: 'DELETE FROM attempt_logs WHERE day_key = ?', args: [todayKey] },
                     { sql: 'DELETE FROM test_sessions WHERE day_key = ?', args: [todayKey] }
                 ], 'write');
-                await resyncPlayersFromLogs(db);
+                const levelConfig = await getLevelConfig(db);
+                await resyncPlayersFromLogs(db, levelConfig);
                 sendJson(res, 200, { ok: true, cleared: 'today', dayKey: todayKey });
                 return;
             }
@@ -125,7 +130,7 @@ export default async function handler(req, res) {
         const levelConfig = await getLevelConfig(db);
 
         // Tính trực tiếp thống kê chuẩn từ attempt_logs theo khoảng thời gian (loại bỏ outlier AFK > 60s)
-        const [playersRes, rangeAggRes, todayCountsRes, playerWeakRes, passedTestsRes] = await Promise.all([
+        const [playersRes, rangeAggRes, todayCountsRes, playerWeakRes, passedTestsRes, allAttemptsRes] = await Promise.all([
             db.execute('SELECT * FROM players ORDER BY completed_at DESC, current_level DESC, solved DESC'),
             db.execute({
                 sql: `SELECT
@@ -159,8 +164,26 @@ export default async function handler(req, res) {
                       FROM test_sessions
                       WHERE is_pass = 1
                       GROUP BY player_id`
+            }),
+            db.execute({
+                sql: `SELECT player_id, mode, difficulty, is_correct, elapsed_ms
+                      FROM attempt_logs
+                      WHERE created_at >= ?
+                      ORDER BY created_at DESC, id DESC`,
+                args: [sinceTs]
             })
         ]);
+
+        const attemptsByPlayer = new Map();
+        for (const r of allAttemptsRes.rows) {
+            const pid = String(r.player_id);
+            let list = attemptsByPlayer.get(pid);
+            if (!list) {
+                list = [];
+                attemptsByPlayer.set(pid, list);
+            }
+            list.push(r);
+        }
 
         const rangeMap = new Map();
         for (const r of rangeAggRes.rows) {
@@ -197,12 +220,52 @@ export default async function handler(req, res) {
             const totalRange = rStats.solved + rStats.errors;
             const acc = totalRange > 0 ? Number(((rStats.solved / totalRange) * 100).toFixed(1)) : 100;
             const completed = Number(p.completed_at || 0) > 0 || passedSet.has(pid);
+            const curLevel = Number(p.current_level || 1);
+            const lvlCfg = levelConfig.levels[curLevel] || levelConfig.levels[1];
+            const pAttempts = attemptsByPlayer.get(pid) || [];
+
+            let lvlSolved = 0;
+            let lvlErrors = 0;
+            let lvlSumMs = 0;
+            let lvlCntMs = 0;
+            let recentTotal = 0;
+            let recentSolved = 0;
+            for (const a of pAttempts) {
+                if (String(a.mode) !== lvlCfg.mode) continue;
+                if (!isDifficultyQualifying(String(a.difficulty || 'medium'), lvlCfg.minDifficulty || 'easy')) continue;
+                const ok = Number(a.is_correct) === 1;
+                const ms = Number(a.elapsed_ms || 0);
+                if (ok) {
+                    lvlSolved += 1;
+                    if (ms <= 60000) {
+                        lvlSumMs += ms;
+                        lvlCntMs += 1;
+                    }
+                } else {
+                    lvlErrors += 1;
+                }
+                if (recentTotal < 30) {
+                    recentTotal += 1;
+                    if (ok) recentSolved += 1;
+                }
+            }
+
+            const currentLevelStats = {
+                level: curLevel,
+                solved: lvlSolved,
+                errors: lvlErrors,
+                requiredSolved: lvlCfg.requiredSolved,
+                accuracyPct: recentTotal > 0 ? Number(((recentSolved / recentTotal) * 100).toFixed(1)) : 100,
+                windowSize: recentTotal,
+                avgSec: lvlCntMs > 0 ? Number((lvlSumMs / lvlCntMs / 1000).toFixed(2)) : 0
+            };
 
             return {
                 id: pid,
                 userId: pid,
                 name: p.name,
-                currentLevel: Number(p.current_level || 1),
+                currentLevel: curLevel,
+                currentLevelStats,
                 completed,
                 completedAt: Number(p.completed_at || 0),
                 solved: rStats.solved,

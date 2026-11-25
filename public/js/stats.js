@@ -166,11 +166,18 @@ export function classifyMemberAndRecommend(member, thresholds = { minSolved: 10,
     if (currentLevel >= 1) {
         const levelNames = { 1: 'Lv.1 (1 chữ)', 2: 'Lv.2 (3 chữ)', 3: 'Lv.3 (6 chữ)', 4: 'Lv.4 (Thi Test)' };
         const lvlLabel = levelNames[currentLevel] || `Lv.${currentLevel}`;
-        if (solved > 0 && acc < thresholds.urgentAcc) {
+        const cls = member?.currentLevelStats;
+        const lvlSolved = cls ? Number(cls.solved || 0) : solved;
+        const lvlReq = cls ? Number(cls.requiredSolved || 0) : 0;
+        const lvlAcc = cls ? Number(cls.accuracyPct ?? 100) : acc;
+        const lvlAvgSec = cls ? Number(cls.avgSec || 0) : avgSec;
+        const progressText = lvlReq > 0 ? `${lvlSolved}/${lvlReq} mã • ` : '';
+
+        if ((cls ? (lvlSolved + Number(cls.errors || 0)) > 0 : solved > 0) && lvlAcc < thresholds.urgentAcc) {
             return {
                 tier: 'urgent',
                 badge: `${lvlLabel} • Cần bổ túc`,
-                advice: `Chính xác thấp (${acc}%) ở ${lvlLabel} — cần luyện chắc tay trước khi lên cấp${weakSuffix}`
+                advice: `Chính xác thấp (${lvlAcc}%) ở ${lvlLabel} (${progressText}TB ${lvlAvgSec.toFixed(1)}s) — cần luyện chắc tay trước khi lên cấp${weakSuffix}`
             };
         }
         return {
@@ -178,7 +185,7 @@ export function classifyMemberAndRecommend(member, thresholds = { minSolved: 10,
             badge: `🔥 ${lvlLabel}`,
             advice: currentLevel === 4
                 ? `Đã mở khóa Thi Test — làm bài thi đạt >=90% để hoàn thành${weakSuffix}`
-                : `Đang leo ${lvlLabel} (Acc ${acc}%${avgSec > 0 ? ` • TB ${avgSec.toFixed(1)}s` : ''}) — hoàn thành mục tiêu để mở Lv.${currentLevel + 1}${weakSuffix}`
+                : `Đang leo ${lvlLabel} (${progressText}Acc ${lvlAcc}%${lvlAvgSec > 0 ? ` • TB ${lvlAvgSec.toFixed(1)}s` : ''}) — hoàn thành mục tiêu để mở Lv.${currentLevel + 1}${weakSuffix}`
         };
     }
 

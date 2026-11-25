@@ -29,6 +29,26 @@ export default async function handler(req, res) {
         const typedInput = String(body.typedInput || '').trim().slice(0, 64);
         const mode = String(body.mode || 'practice');
         const lvlNum = MODE_TO_LEVEL[mode] || 1;
+
+        // Chặn phía server nếu Level đang bị khóa (tránh tab cũ chưa F5 gửi nhầm bài lên Level cao hơn)
+        if (levelConfig.lockProgression && lvlNum > 1) {
+            const curRes = await db.execute({ sql: 'SELECT current_level FROM players WHERE id = ?', args: [playerId] });
+            let allowedLevel = curRes.rows.length > 0 ? Number(curRes.rows[0].current_level || 1) : 1;
+            if (lvlNum > allowedLevel && curRes.rows.length > 0) {
+                const info = await computePlayerLevelProgress(db, playerId, levelConfig);
+                allowedLevel = Math.max(allowedLevel, info.computedLevel);
+            }
+            if (lvlNum > allowedLevel) {
+                sendJson(res, 403, {
+                    ok: false,
+                    code: 'LEVEL_LOCKED',
+                    allowedLevel,
+                    levelConfig,
+                    error: `Chưa mở khóa Level ${lvlNum}. Vui lòng hoàn thành Level ${allowedLevel} trước.`
+                });
+                return;
+            }
+        }
         const maxAllowedMs = (levelConfig.levels[lvlNum]?.timeLimitSec || 35) * 1000;
         // Chặn thời gian AFK: không bao giờ ghi nhận elapsedMs vượt quá thời gian giới hạn của Level
         const rawElapsedMs = Math.max(100, Math.round(Number(body.elapsedMs || 0)));

@@ -344,6 +344,18 @@ test('4-Level progression, Admin timer settings, AFK outlier capping, and Reset 
     assert.equal(afterReset.result.body.teamRecords.length, 1);
     assert.equal(afterReset.result.body.teamRecords[0].todaySolved, 0);
     assert.equal(afterReset.result.body.teamRecords[0].solved, 0);
+    assert.equal(afterReset.result.body.teamRecords[0].currentLevel, 1); // recomputed back to Lv.1 after clearing today's logs!
+
+    // 4. Server-side level lock rejects Lv.2 attempt while player is on Lv.1
+    const lockedRes = createMockRes();
+    await attemptHandler({
+        method: 'POST',
+        body: { userId: uid, name: 'Phương', mode: 'reflex', difficulty: 'medium', target: '강모도', typedInput: '강모도', isCorrect: true, elapsedMs: 3000 },
+        headers: {}
+    }, lockedRes);
+    assert.equal(lockedRes.result.statusCode, 403);
+    assert.equal(lockedRes.result.body.code, 'LEVEL_LOCKED');
+    assert.equal(lockedRes.result.body.allowedLevel, 1);
 
     delete process.env.LOCAL_DB_URL;
     resetDbClientForTest();

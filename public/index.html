@@ -1231,6 +1231,20 @@
                     errorType,
                     elapsedMs
                 });
+                if (resp && resp.code === 'LEVEL_LOCKED') {
+                    if (resp.levelConfig) applyLevelConfig(resp.levelConfig);
+                    state.currentLevel = Number(resp.allowedLevel || 1);
+                    renderLevelButtons();
+                    const fallbackMode = LEVEL_TO_MODE[state.currentLevel] || 'practice';
+                    showOverlay(
+                        `🔒 CHƯA MỞ KHÓA LEVEL`,
+                        resp.error || `Vui lòng hoàn thành Level ${state.currentLevel} trước.`,
+                        'text-amber-300',
+                        1500
+                    );
+                    setTimeout(() => setMode(fallbackMode), 1550);
+                    return;
+                }
                 if (resp && resp.ok) {
                     if (resp.summary) {
                         state.solved = resp.summary.solved;
@@ -1524,8 +1538,13 @@
                     const presenceHtml = online
                         ? `<span class="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-400"><span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>Đang online</span>`
                         : `<span class="inline-flex items-center gap-1 text-[10px] text-slate-400"><span class="w-1.5 h-1.5 rounded-full bg-slate-600"></span>Online lần cuối: ${formatRelativeTime(m.lastActiveAt)}${m.lastActiveAt ? ` (${formatExactTime(m.lastActiveAt)})` : ''}</span>`;
-                    const speedText = m.solved > 0 ? `${Number(m.avgTimeSec).toFixed(1)}s` : '--';
-                    const acc = Number(m.accuracyPct ?? 100);
+                    const cls = m.currentLevelStats;
+                    const displayAcc = cls ? Number(cls.accuracyPct ?? 100) : Number(m.accuracyPct ?? 100);
+                    const displayAvg = cls ? Number(cls.avgSec || 0) : Number(m.avgTimeSec || 0);
+                    const displaySolved = cls ? Number(cls.solved || 0) : Number(m.solved || 0);
+                    const lvlTag = m.currentLevel ? ` (Lv.${m.currentLevel})` : '';
+                    const speedText = displayAvg > 0 ? `${displayAvg.toFixed(1)}s` : (m.solved > 0 ? `${Number(m.avgTimeSec).toFixed(1)}s` : '--');
+                    const acc = displayAcc;
                     const tierStyles = m.assessment.tier === 'pass'
                         ? { pill: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40', bar: 'bg-emerald-400', border: 'border-slate-800' }
                         : m.assessment.tier === 'urgent'
@@ -1550,16 +1569,16 @@
 
                                 <div class="flex items-center gap-1.5 shrink-0">
                                     <div class="grid grid-cols-3 gap-1.5 text-center">
-                                        <div class="bg-slate-900 border border-slate-800 rounded-lg px-2 py-1">
+                                        <div class="bg-slate-900 border border-slate-800 rounded-lg px-2 py-1" title="Hôm nay / Tổng mã giải đúng">
                                             <div class="text-[9px] text-slate-400">HN / Tổng</div>
                                             <div class="text-xs font-extrabold text-white"><span class="text-amber-300">${m.todayVal}</span>/${m.solved || 0}</div>
                                         </div>
-                                        <div class="bg-slate-900 border border-slate-800 rounded-lg px-2 py-1">
-                                            <div class="text-[9px] text-slate-400">Chính xác</div>
+                                        <div class="bg-slate-900 border border-slate-800 rounded-lg px-2 py-1" title="Độ chính xác riêng của Level hiện tại${cls && cls.requiredSolved ? ` (${displaySolved}/${cls.requiredSolved} mã)` : ''}">
+                                            <div class="text-[9px] text-slate-400">Acc${lvlTag}</div>
                                             <div class="text-xs font-extrabold text-violet-300">${acc}%</div>
                                         </div>
-                                        <div class="bg-slate-900 border border-slate-800 rounded-lg px-2 py-1">
-                                            <div class="text-[9px] text-slate-400">TB/mã</div>
+                                        <div class="bg-slate-900 border border-slate-800 rounded-lg px-2 py-1" title="Tốc độ trung bình riêng của Level hiện tại">
+                                            <div class="text-[9px] text-slate-400">TB${lvlTag}</div>
                                             <div class="text-xs font-extrabold text-sky-400">${speedText}</div>
                                         </div>
                                     </div>
@@ -1894,16 +1913,20 @@
 
                 const recentErrorsHtml = pd.recentErrors.length === 0
                     ? `<div class="text-xs text-slate-500 py-3 text-center">Chưa có lần lỗi nào gần đây.</div>`
-                    : pd.recentErrors.slice(0, 10).map((e) => `
+                    : pd.recentErrors.slice(0, 10).map((e) => {
+                        const errLvl = MODE_TO_LEVEL[e.mode] || 1;
+                        return `
                         <div class="bg-slate-950/80 border border-slate-800 rounded-lg px-2.5 py-1.5 flex flex-wrap items-center justify-between gap-1.5 text-xs">
                             <div class="flex items-center gap-1.5 flex-wrap">
+                                <span class="px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300 text-[10px] font-bold">Lv.${errLvl}</span>
                                 ${formatErrorTypeBadge(e.errorType)}
                                 <span class="font-bold text-emerald-300">${escapeHtml(e.target)}</span>
                                 ${e.typedInput ? `<span class="text-slate-500">→ gõ:</span><span class="font-bold text-rose-300">${escapeHtml(e.typedInput)}</span>` : ''}
                             </div>
                             <span class="text-[10px] text-slate-500">${e.elapsedSec}s • ${formatRelativeTime(e.createdAt)}</span>
                         </div>
-                    `).join('');
+                    `;
+                    }).join('');
 
                 const testHistHtml = pd.testHistory.length === 0
                     ? `<div class="text-xs text-slate-500 py-2 text-center">Chưa thi Test lần nào.</div>`
