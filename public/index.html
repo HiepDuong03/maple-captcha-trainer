@@ -2546,12 +2546,12 @@
             }
 
             function requiresManualEnterSubmit() {
-                return state.mode === 'survival' || state.mode === 'test';
+                return state.mode === 'test';
             }
 
             function checkMatch(isManualSubmit = false) {
                 if (state.isTransitioning) return;
-                // Ở Lv.3 & Lv.4: tắt tự động nhảy câu — bắt buộc tự soát lại 6 chữ và bấm Enter / Kiểm tra giống in-game thật
+                // Ở Lv.4 (Thi Test): tắt tự động nhảy câu — bắt buộc tự soát lại 6 chữ và bấm Enter / Kiểm tra giống in-game thật
                 if (requiresManualEnterSubmit() && !isManualSubmit) {
                     return;
                 }
