@@ -384,6 +384,8 @@ export default async function handler(req, res) {
 
         let playerDetail = null;
         if (playerId) {
+            const pRowRes = await db.execute({ sql: 'SELECT current_level FROM players WHERE id = ?', args: [playerId] });
+            const pCurrentLevel = Number(pRowRes.rows[0]?.current_level || 1);
             const [pMistakesRes, pPairsRes, pRecentErrorsRes, pTestsRes, pLevelInfo] = await Promise.all([
                 db.execute({
                     sql: `SELECT expected_char, COUNT(*) AS cnt
@@ -418,7 +420,7 @@ export default async function handler(req, res) {
                           LIMIT 15`,
                     args: [playerId]
                 }),
-                computePlayerLevelProgress(db, playerId, levelConfig)
+                computePlayerLevelProgress(db, playerId, levelConfig, { persistedLevel: pCurrentLevel })
             ]);
 
             playerDetail = {

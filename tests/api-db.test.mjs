@@ -413,3 +413,70 @@ test('Rolling 30-attempt window allows recovery from early mistakes without gett
     delete process.env.LOCAL_DB_URL;
     resetDbClientForTest();
 });
+
+test('Already-unlocked Lv.2 player who later fails on Lv.1 can still advance to Lv.3 after passing Lv.2', async () => {
+    process.env.LOCAL_DB_URL = ':memory:';
+    delete process.env.TURSO_DATABASE_URL;
+    delete process.env.ADMIN_PIN;
+    resetDbClientForTest();
+
+    const setRes = createMockRes();
+    await adminHandler({
+        method: 'PATCH',
+        body: {
+            action: 'update-settings',
+            levelConfig: {
+                lockProgression: true,
+                levels: {
+                    1: { timeLimitSec: 6, requiredSolved: 2, minAccuracyPct: 90, minDifficulty: 'easy' },
+                    2: { timeLimitSec: 15, requiredSolved: 2, minAccuracyPct: 90, minDifficulty: 'easy' }
+                }
+            }
+        },
+        headers: {}
+    }, setRes);
+
+    const reg = createMockRes();
+    await playerHandler({ method: 'POST', body: { action: 'login', name: 'TuyenCase', pin: '3333' }, headers: {} }, reg);
+    const uid = reg.result.body.profile.userId;
+
+    // Pass Lv.1 (2 solved) -> unlocks Lv.2
+    for (let i = 0; i < 2; i++) {
+        const r = createMockRes();
+        await attemptHandler({
+            method: 'POST',
+            body: { userId: uid, name: 'TuyenCase', mode: 'practice', difficulty: 'easy', target: '가', typedInput: '가', isCorrect: true, elapsedMs: 1500 },
+            headers: {}
+        }, r);
+    }
+
+    // Later gets AFK timeouts on Lv.1 -> Lv.1 accuracy drops below 90%
+    for (let i = 0; i < 3; i++) {
+        const r = createMockRes();
+        await attemptHandler({
+            method: 'POST',
+            body: { userId: uid, name: 'TuyenCase', mode: 'practice', difficulty: 'easy', target: '가', typedInput: '', isCorrect: false, errorType: 'timeout', elapsedMs: 6000 },
+            headers: {}
+        }, r);
+    }
+
+    // Now completes Lv.2 (2 solved, 100%) -> MUST advance to Lv.3 (not blocked by Lv.1!)
+    let lv2Res = null;
+    for (let i = 0; i < 2; i++) {
+        const r = createMockRes();
+        await attemptHandler({
+            method: 'POST',
+            body: { userId: uid, name: 'TuyenCase', mode: 'reflex', difficulty: 'easy', target: '강모도', typedInput: '강모도', isCorrect: true, elapsedMs: 5000 },
+            headers: {}
+        }, r);
+        lv2Res = r.result.body;
+    }
+
+    assert.equal(lv2Res.levelProgress[1].passed, true);
+    assert.equal(lv2Res.levelProgress[2].passed, true);
+    assert.equal(lv2Res.currentLevel, 3);
+    assert.equal(lv2Res.leveledUp, true);
+
+    delete process.env.LOCAL_DB_URL;
+    resetDbClientForTest();
+});

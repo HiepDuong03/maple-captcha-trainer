@@ -233,8 +233,8 @@
                     <canvas id="captcha-canvas" class="w-full h-full block pixelated"></canvas>
                 </div>
 
-                <!-- Lớp phủ phản hồi Đúng / Sai / Hết giờ -->
-                <div id="feedback-overlay" class="hidden absolute inset-0 bg-slate-950/80 backdrop-blur-xs flex flex-col items-center justify-center z-10 transition-opacity">
+                <!-- Lớp phủ phản hồi Đúng / Sai / Hết giờ / Tạm dừng AFK -->
+                <div id="feedback-overlay" onclick="App.resumeFromIdleOverlay()" class="hidden absolute inset-0 bg-slate-950/85 backdrop-blur-xs flex flex-col items-center justify-center z-10 transition-opacity px-4 text-center">
                     <div id="feedback-title" class="text-lg sm:text-2xl font-extrabold tracking-wide">✔ CHÍNH XÁC!</div>
                     <div id="feedback-sub" class="text-xs sm:text-sm text-slate-300 mt-1 font-mono"></div>
                 </div>
@@ -1025,6 +1025,8 @@
                 survivalTimerId: null,
                 survivalEndTime: 0,
                 pausedRemainingMs: 0,
+                idleEmptyTimeouts: 0,
+                isIdlePaused: false,
                 testSession: null,
                 lastTestResult: null,
                 adminTab: 'overview',
@@ -2345,6 +2347,7 @@
             function generateNewCaptcha() {
                 stopSurvivalTimer();
                 state.pausedRemainingMs = 0;
+                state.isIdlePaused = false;
                 state.isTransitioning = false;
                 state.isComposing = false;
                 state.jamoBuffer = [];
@@ -2484,6 +2487,14 @@
                 dom.windowEl.classList.add('animate-shake');
             }
 
+            function resumeFromIdleOverlay() {
+                if (!state.isIdlePaused) return;
+                state.isIdlePaused = false;
+                state.idleEmptyTimeouts = 0;
+                dom.feedbackOverlay.classList.remove('cursor-pointer');
+                generateNewCaptcha();
+            }
+
             function handleTimeout() {
                 if (state.isTransitioning) return;
                 state.isTransitioning = true;
@@ -2502,6 +2513,11 @@
                     state.testSession.missedTargets.push(state.target);
                     state.testSession.currentIndex += 1;
                 }
+                if (typed === '' && state.mode !== 'test') {
+                    state.idleEmptyTimeouts += 1;
+                } else {
+                    state.idleEmptyTimeouts = 0;
+                }
                 updateStatsUI();
                 logAttemptToDb({
                     isCorrect: false,
@@ -2510,6 +2526,15 @@
                     elapsedMs: limitMs
                 });
                 SoundFX.wrong();
+
+                // Nếu hết giờ liên tiếp 2 lần mà chưa gõ gì -> tạm dừng AFK để không bị chạy timeout hàng loạt làm tụt %
+                if (state.idleEmptyTimeouts >= 2 && state.mode !== 'test') {
+                    state.isIdlePaused = true;
+                    dom.feedbackOverlay.classList.add('cursor-pointer');
+                    showOverlay('⏸ TẠM DỪNG (AFK)', `Đáp án: ${state.target} • Bấm vào đây để tiếp tục luyện`, 'text-amber-300', 0);
+                    return;
+                }
+
                 showOverlay('⏰ HẾT GIỜ!', `Đáp án: ${state.target}`, 'text-rose-400', CONFIG.TIMEOUT_DELAY_MS);
                 setTimeout(() => {
                     if (state.mode === 'test' && state.testSession && state.testSession.currentIndex >= state.testSession.totalQuestions) {
@@ -2545,7 +2570,11 @@
             }
 
             function handleDirectKey(key) {
+                if (state.isIdlePaused) {
+                    resumeFromIdleOverlay();
+                }
                 if (state.isTransitioning || state.isModalOpen) return;
+                state.idleEmptyTimeouts = 0;
                 if (key === 'Backspace') {
                     if (state.jamoBuffer.length > 0) {
                         state.jamoBuffer.pop();
@@ -2582,6 +2611,8 @@
                     return;
                 }
 
+                state.idleEmptyTimeouts = 0;
+                state.isIdlePaused = false;
                 state.mode = mode;
                 renderLevelButtons();
 
@@ -2907,6 +2938,7 @@
                 saveAdminSettings,
                 resetTodayData,
                 setMemberLevelFromAdmin,
+                resumeFromIdleOverlay,
                 copyTeamReport,
                 downloadTeamCsv
             };

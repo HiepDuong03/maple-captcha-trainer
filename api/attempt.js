@@ -105,8 +105,10 @@ export default async function handler(req, res) {
         }
 
         // 3. Tính lại toàn bộ chỉ số & Level trực tiếp từ SQL (chống lệch dữ liệu giữa nhiều tab/thiết bị)
-        const [prevPlayerRes, aggRes, levelInfo] = await Promise.all([
-            db.execute({ sql: 'SELECT current_level FROM players WHERE id = ?', args: [playerId] }),
+        const prevPlayerRes = await db.execute({ sql: 'SELECT current_level FROM players WHERE id = ?', args: [playerId] });
+        const prevLevel = Number(prevPlayerRes.rows[0]?.current_level || 1);
+
+        const [aggRes, levelInfo] = await Promise.all([
             db.execute({
                 sql: `SELECT
                         SUM(CASE WHEN is_correct = 1 THEN 1 ELSE 0 END) AS solved_cnt,
@@ -118,10 +120,9 @@ export default async function handler(req, res) {
                       WHERE player_id = ?`,
                 args: [playerId]
             }),
-            computePlayerLevelProgress(db, playerId, levelConfig)
+            computePlayerLevelProgress(db, playerId, levelConfig, { persistedLevel: prevLevel })
         ]);
 
-        const prevLevel = Number(prevPlayerRes.rows[0]?.current_level || 1);
         const newLevel = Math.max(prevLevel, levelInfo.computedLevel);
         const leveledUp = newLevel > prevLevel;
 

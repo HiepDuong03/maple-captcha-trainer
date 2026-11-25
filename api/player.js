@@ -33,7 +33,9 @@ async function loadPlayerProfile(db, playerRow, levelConfig) {
                   LIMIT 10`,
             args: [playerRow.id]
         }),
-        computePlayerLevelProgress(db, playerRow.id, levelConfig)
+        computePlayerLevelProgress(db, playerRow.id, levelConfig, {
+            persistedLevel: Number(playerRow.current_level || 1)
+        })
     ]);
 
     const agg = aggRes.rows[0] || {};
