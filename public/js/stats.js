@@ -164,7 +164,7 @@ export function classifyMemberAndRecommend(member, thresholds = { minSolved: 10,
     }
 
     if (currentLevel >= 1) {
-        const levelNames = { 1: 'Lv.1 (1 chữ)', 2: 'Lv.2 (3 chữ)', 3: 'Lv.3 (6 chữ)', 4: 'Lv.4 (Thi Test)' };
+        const levelNames = { 1: 'Lv.1 (1 chữ)', 2: 'Lv.2 (3 chữ)', 3: 'Lv.3 (6 chữ)', 4: 'Lv.4 (Thi Test)', 5: 'Lv.5 (Luyện+)' };
         const lvlLabel = levelNames[currentLevel] || `Lv.${currentLevel}`;
         const cls = member?.currentLevelStats;
         const lvlSolved = cls ? Number(cls.solved || 0) : solved;

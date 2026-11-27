@@ -54,7 +54,7 @@
                     </div>
                 </div>
 
-                <!-- Thanh 4 Level trên Desktop -->
+                <!-- Thanh 5 Level trên Desktop -->
                 <div class="hidden md:flex items-center bg-slate-950 p-0.5 rounded-xl border border-slate-800 text-xs">
                     <button onclick="App.setMode('practice')" id="btn-mode-practice" class="mode-btn px-2.5 py-1.5 rounded-lg font-bold transition-all bg-amber-500 text-slate-950">
                         Lv.1 (1 chữ)
@@ -67,6 +67,9 @@
                     </button>
                     <button onclick="App.setMode('test')" id="btn-mode-test" class="mode-btn px-2.5 py-1.5 rounded-lg font-medium transition-all text-slate-400 hover:text-white">
                         Lv.4 (Thi)
+                    </button>
+                    <button onclick="App.setMode('master')" id="btn-mode-master" class="mode-btn px-2.5 py-1.5 rounded-lg font-medium transition-all text-rose-300 hover:text-white">
+                        🔥 Lv.5 (Luyện+)
                     </button>
                 </div>
 
@@ -92,8 +95,8 @@
                 </div>
             </div>
 
-            <!-- Thanh 4 Level trên Mobile / Tablet (4 cột đều, không wrap xấu) -->
-            <div class="grid grid-cols-4 md:hidden bg-slate-950 p-0.5 rounded-xl border border-slate-800 text-[10px] gap-0.5">
+            <!-- Thanh 5 Level trên Mobile / Tablet -->
+            <div class="grid grid-cols-5 md:hidden bg-slate-950 p-0.5 rounded-xl border border-slate-800 text-[10px] gap-0.5">
                 <button onclick="App.setMode('practice')" id="btn-mode-mobile-practice" class="py-1.5 px-1 rounded-lg font-bold text-center truncate transition-all bg-amber-500 text-slate-950">
                     Lv.1 (1c)
                 </button>
@@ -105,6 +108,9 @@
                 </button>
                 <button onclick="App.setMode('test')" id="btn-mode-mobile-test" class="py-1.5 px-1 rounded-lg font-medium text-center truncate transition-all text-slate-400">
                     Lv.4 (Thi)
+                </button>
+                <button onclick="App.setMode('master')" id="btn-mode-mobile-master" class="py-1.5 px-1 rounded-lg font-medium text-center truncate transition-all text-rose-300">
+                    🔥 Lv.5+
                 </button>
             </div>
         </div>
@@ -199,6 +205,7 @@
                         <option value="easy">Dễ</option>
                         <option value="medium" selected>Chuẩn In-Game</option>
                         <option value="hard">Ác Mộng</option>
+                        <option value="extreme">Địa Ngục (Siêu Nhiễu)</option>
                     </select>
 
                     <select id="length-select" onchange="App.changeLength()" class="bg-slate-950 border border-slate-700 rounded-xl px-2 py-1 text-[11px] sm:text-xs font-semibold text-slate-200 focus:outline-none focus:border-amber-500">
@@ -541,7 +548,8 @@
             HANDWRITING_FONTS: {
                 easy: ['"Gaegu"', '"Hi Melody"', '"Single Day"'],
                 medium: ['"Nanum Pen Script"', '"Gaegu"', '"Hi Melody"', '"Nanum Brush Script"'],
-                hard: ['"Nanum Brush Script"', '"East Sea Dokdo"', '"Nanum Pen Script"']
+                hard: ['"Nanum Brush Script"', '"East Sea Dokdo"', '"Nanum Pen Script"'],
+                extreme: ['"East Sea Dokdo"', '"Nanum Brush Script"', '"Nanum Pen Script"']
             },
             MAPLE_WORDS: [
                 "히든스트리트", "딩레오나르도", "어리스차이브레", "해머스맨", "옷방지크레",
@@ -662,18 +670,20 @@
             function createSpec(text, difficulty) {
                 const fonts = CONFIG.HANDWRITING_FONTS[difficulty] || CONFIG.HANDWRITING_FONTS.medium;
                 const palette = pick(MAP_PALETTES);
+                const isExtreme = difficulty === 'extreme';
 
-                const lowW = difficulty === 'hard' ? 255 : (difficulty === 'medium' ? 316 : 370);
-                const lowH = difficulty === 'hard' ? 62 : (difficulty === 'medium' ? 78 : 90);
+                const lowW = isExtreme ? 232 : (difficulty === 'hard' ? 255 : (difficulty === 'medium' ? 316 : 370));
+                const lowH = isExtreme ? 56 : (difficulty === 'hard' ? 62 : (difficulty === 'medium' ? 78 : 90));
 
                 const mapBlocks = [];
-                for (let i = 0; i < 12; i++) {
+                const blockCount = isExtreme ? 18 : 12;
+                for (let i = 0; i < blockCount; i++) {
                     mapBlocks.push({
                         x: rand(0, lowW),
                         y: rand(0, lowH),
-                        w: rand(16, 52),
-                        h: rand(14, 38),
-                        alpha: rand(0.08, 0.24),
+                        w: rand(14, 52),
+                        h: rand(12, 38),
+                        alpha: isExtreme ? rand(0.12, 0.30) : rand(0.08, 0.24),
                         light: Math.random() > 0.5
                     });
                 }
@@ -681,59 +691,87 @@
                 const primaryFont = pick(fonts);
                 const chars = [...text].map((ch) => ({
                     ch,
-                    font: Math.random() > 0.35 ? primaryFont : pick(fonts),
-                    size: rand(lowH * 0.54, lowH * 0.66),
-                    yOffset: rand(-4, 5),
-                    xJitter: rand(-2.5, 2.5),
-                    rot: difficulty === 'easy' ? rand(-0.08, 0.08) : (difficulty === 'medium' ? rand(-0.15, 0.15) : rand(-0.26, 0.26)),
-                    skewX: difficulty === 'easy' ? rand(-0.06, 0.06) : (difficulty === 'medium' ? rand(-0.14, 0.14) : rand(-0.24, 0.24)),
-                    scaleY: rand(0.92, 1.08),
+                    font: Math.random() > (isExtreme ? 0.45 : 0.35) ? primaryFont : pick(fonts),
+                    size: rand(lowH * 0.54, lowH * (isExtreme ? 0.68 : 0.66)),
+                    yOffset: rand(isExtreme ? -5 : -4, isExtreme ? 6 : 5),
+                    xJitter: rand(isExtreme ? -3.2 : -2.5, isExtreme ? 3.2 : 2.5),
+                    rot: difficulty === 'easy'
+                        ? rand(-0.08, 0.08)
+                        : (difficulty === 'medium'
+                            ? rand(-0.15, 0.15)
+                            : (isExtreme ? rand(-0.33, 0.33) : rand(-0.26, 0.26))),
+                    skewX: difficulty === 'easy'
+                        ? rand(-0.06, 0.06)
+                        : (difficulty === 'medium'
+                            ? rand(-0.14, 0.14)
+                            : (isExtreme ? rand(-0.29, 0.29) : rand(-0.24, 0.24))),
+                    scaleY: rand(isExtreme ? 0.88 : 0.92, isExtreme ? 1.12 : 1.08),
                     color: pick(['#160f1c', '#221222', '#141924', '#291419'])
                 }));
 
                 const padX = lowW * 0.09;
                 const stepX = (lowW - padX * 2) / Math.max(1, chars.length);
                 const ghosts = chars.map((c, idx) => ({
-                    ch: (difficulty === 'hard' && Math.random() < 0.35) ? pick(CONFIG.SYLLABLES) : c.ch,
+                    ch: ((difficulty === 'hard' || isExtreme) && Math.random() < (isExtreme ? 0.55 : 0.35)) ? pick(CONFIG.SYLLABLES) : c.ch,
                     font: c.font,
-                    size: c.size * rand(0.94, 1.08),
-                    x: padX + stepX * (idx + 0.5) + rand(-10, 10),
-                    y: lowH / 2 + c.yOffset + rand(-7, 9),
-                    rot: c.rot + rand(-0.14, 0.14),
-                    skewX: c.skewX + rand(-0.1, 0.1),
-                    alpha: difficulty === 'hard' ? rand(0.20, 0.32) : (difficulty === 'medium' ? rand(0.11, 0.19) : rand(0.05, 0.10)),
+                    size: c.size * rand(0.94, 1.1),
+                    x: padX + stepX * (idx + 0.5) + rand(isExtreme ? -12 : -10, isExtreme ? 12 : 10),
+                    y: lowH / 2 + c.yOffset + rand(-8, 9),
+                    rot: c.rot + rand(-0.18, 0.18),
+                    skewX: c.skewX + rand(-0.12, 0.12),
+                    alpha: isExtreme ? rand(0.24, 0.36) : (difficulty === 'hard' ? rand(0.20, 0.32) : (difficulty === 'medium' ? rand(0.11, 0.19) : rand(0.05, 0.10))),
                     color: pick(['#462b4f', '#543838', '#334559'])
                 }));
 
-                const lineCount = difficulty === 'hard' ? 4 : (difficulty === 'medium' ? 2 : 1);
+                // Mức Địa Ngục tăng dày cả gạch thẳng cắt ngang lẫn gạch cong Bezier đè chữ
+                const lineCount = isExtreme ? 11 : (difficulty === 'hard' ? 4 : (difficulty === 'medium' ? 2 : 1));
                 const lines = [];
                 for (let i = 0; i < lineCount; i++) {
+                    const useSpanSlash = isExtreme && i >= 6;
+                    const x1 = useSpanSlash ? rand(lowW * 0.05, lowW * 0.85) : rand(0, lowW * 0.22);
+                    const y1 = useSpanSlash ? rand(lowH * 0.08, lowH * 0.92) : rand(lowH * 0.18, lowH * 0.84);
+                    const x2 = useSpanSlash ? Math.min(lowW, Math.max(0, x1 + rand(-75, 75))) : rand(lowW * 0.78, lowW);
+                    const y2 = useSpanSlash ? rand(lowH * 0.08, lowH * 0.92) : rand(lowH * 0.18, lowH * 0.84);
+                    const curved = isExtreme && Math.random() < 0.65;
                     lines.push({
-                        x1: rand(0, lowW * 0.22),
-                        y1: rand(lowH * 0.22, lowH * 0.80),
-                        x2: rand(lowW * 0.78, lowW),
-                        y2: rand(lowH * 0.22, lowH * 0.80),
-                        width: difficulty === 'hard' ? rand(0.8, 1.2) : rand(0.55, 0.9),
-                        color: pick(['rgba(30,20,38,0.48)', 'rgba(65,35,50,0.42)', 'rgba(30,45,65,0.40)'])
+                        x1,
+                        y1,
+                        x2,
+                        y2,
+                        curved,
+                        cx: (x1 + x2) / 2 + rand(-lowW * 0.15, lowW * 0.15),
+                        cy: (y1 + y2) / 2 + rand(-lowH * 0.45, lowH * 0.45),
+                        width: isExtreme ? rand(0.95, 1.55) : (difficulty === 'hard' ? rand(0.8, 1.2) : rand(0.55, 0.9)),
+                        color: isExtreme
+                            ? pick([
+                                'rgba(20,12,28,0.62)',
+                                'rgba(55,22,42,0.58)',
+                                'rgba(18,36,58,0.58)',
+                                'rgba(35,18,18,0.56)',
+                                'rgba(255,255,255,0.44)'
+                            ])
+                            : pick(['rgba(30,20,38,0.48)', 'rgba(65,35,50,0.42)', 'rgba(30,45,65,0.40)'])
                     });
                 }
 
-                const dotCount = difficulty === 'hard' ? 440 : (difficulty === 'medium' ? 230 : 85);
+                const dotCount = isExtreme ? 760 : (difficulty === 'hard' ? 440 : (difficulty === 'medium' ? 230 : 85));
                 const dots = [];
                 for (let i = 0; i < dotCount; i++) {
+                    const isScratchTick = isExtreme && Math.random() > 0.84;
                     dots.push({
                         x: Math.floor(rand(0, lowW)),
                         y: Math.floor(rand(0, lowH)),
-                        s: (difficulty === 'hard' && Math.random() > 0.85) ? 2 : 1,
+                        w: isScratchTick ? Math.floor(rand(2, 5)) : ((difficulty === 'hard' || isExtreme) && Math.random() > 0.82 ? 2 : 1),
+                        h: (isExtreme && Math.random() > 0.88) ? 2 : ((difficulty === 'hard' && Math.random() > 0.85) ? 2 : 1),
                         color: pick(['#18121f', '#4a2b42', '#ffffff', '#6e4564', '#2c3d52']),
-                        alpha: rand(0.28, 0.70)
+                        alpha: isExtreme ? rand(0.32, 0.78) : rand(0.28, 0.70)
                     });
                 }
 
-                // Tham số uốn sóng nhẹ (wave distortion) ở mức medium & hard cho sát ảnh thực tế
+                // Tham số uốn sóng nhẹ (wave distortion) ở mức medium, hard & extreme cho sát ảnh thực tế
                 const wave = {
-                    amp: difficulty === 'hard' ? rand(1.6, 2.4) : (difficulty === 'medium' ? rand(0.7, 1.3) : 0),
-                    freq: rand(0.05, 0.09),
+                    amp: isExtreme ? rand(2.2, 3.1) : (difficulty === 'hard' ? rand(1.6, 2.4) : (difficulty === 'medium' ? rand(0.7, 1.3) : 0)),
+                    freq: isExtreme ? rand(0.06, 0.11) : rand(0.05, 0.09),
                     phase: rand(0, Math.PI * 2)
                 };
 
@@ -820,7 +858,11 @@
                     lines.forEach((l) => {
                         octx.beginPath();
                         octx.moveTo(l.x1, l.y1);
-                        octx.lineTo(l.x2, l.y2);
+                        if (l.curved) {
+                            octx.quadraticCurveTo(l.cx, l.cy, l.x2, l.y2);
+                        } else {
+                            octx.lineTo(l.x2, l.y2);
+                        }
                         octx.lineWidth = l.width;
                         octx.strokeStyle = l.color;
                         octx.stroke();
@@ -829,7 +871,7 @@
                     dots.forEach((d) => {
                         octx.fillStyle = d.color;
                         octx.globalAlpha = d.alpha;
-                        octx.fillRect(d.x, d.y, d.s, d.s);
+                        octx.fillRect(d.x, d.y, d.w || d.s || 1, d.h || d.s || 1);
                     });
                     octx.globalAlpha = 1;
 
@@ -984,17 +1026,19 @@
                     1: { level: 1, mode: 'practice', name: 'Lv.1: Tập Phím', shortName: 'Lv.1 (1 chữ)', mobileName: 'Lv.1 (1c)', charLength: 1, timeLimitSec: 8, requiredSolved: 20, minAccuracyPct: 90, minDifficulty: 'easy', allowHints: true },
                     2: { level: 2, mode: 'reflex', name: 'Lv.2: Phản Xạ', shortName: 'Lv.2 (3 chữ)', mobileName: 'Lv.2 (3c)', charLength: 3, timeLimitSec: 18, requiredSolved: 20, minAccuracyPct: 90, minDifficulty: 'medium', allowHints: true },
                     3: { level: 3, mode: 'survival', name: 'Lv.3: Sinh Tồn', shortName: 'Lv.3 (6 chữ)', mobileName: 'Lv.3 (6c)', charLength: 6, timeLimitSec: 35, requiredSolved: 15, minAccuracyPct: 90, minDifficulty: 'medium', allowHints: false },
-                    4: { level: 4, mode: 'test', name: 'Lv.4: Thi Test', shortName: 'Lv.4 (Thi)', mobileName: 'Lv.4 (Thi)', charLength: 6, timeLimitSec: 15, requiredSolved: 10, minAccuracyPct: 90, minDifficulty: 'medium', allowHints: false }
+                    4: { level: 4, mode: 'test', name: 'Lv.4: Thi Test', shortName: 'Lv.4 (Thi)', mobileName: 'Lv.4 (Thi)', charLength: 6, timeLimitSec: 15, requiredSolved: 10, minAccuracyPct: 90, minDifficulty: 'medium', allowHints: false },
+                    5: { level: 5, mode: 'master', name: 'Lv.5: Địa Ngục', shortName: 'Lv.5 (Luyện+)', mobileName: 'Lv.5+', charLength: 6, timeLimitSec: 15, requiredSolved: 15, minAccuracyPct: 90, minDifficulty: 'extreme', allowHints: false, alwaysUnlocked: true }
                 }
             };
-            const DIFF_RANK = { easy: 1, medium: 2, hard: 3 };
+            const DIFF_RANK = { easy: 1, medium: 2, hard: 3, extreme: 4 };
             function formatMinDiffLabel(d) {
-                if (d === 'hard') return 'Ác Mộng';
+                if (d === 'extreme') return 'Địa Ngục';
+                if (d === 'hard') return 'Ác Mộng+';
                 if (d === 'medium') return 'Chuẩn In-Game+';
                 return 'Dễ+';
             }
-            const MODE_TO_LEVEL = { practice: 1, reflex: 2, survival: 3, test: 4 };
-            const LEVEL_TO_MODE = { 1: 'practice', 2: 'reflex', 3: 'survival', 4: 'test' };
+            const MODE_TO_LEVEL = { practice: 1, reflex: 2, survival: 3, test: 4, master: 5 };
+            const LEVEL_TO_MODE = { 1: 'practice', 2: 'reflex', 3: 'survival', 4: 'test', 5: 'master' };
 
             const state = {
                 playerName: '',
@@ -1168,7 +1212,8 @@
                         1: { ...DEFAULT_LEVEL_CONFIG.levels[1], ...(cfg.levels[1] || cfg.levels['1'] || {}) },
                         2: { ...DEFAULT_LEVEL_CONFIG.levels[2], ...(cfg.levels[2] || cfg.levels['2'] || {}) },
                         3: { ...DEFAULT_LEVEL_CONFIG.levels[3], ...(cfg.levels[3] || cfg.levels['3'] || {}) },
-                        4: { ...DEFAULT_LEVEL_CONFIG.levels[4], ...(cfg.levels[4] || cfg.levels['4'] || {}) }
+                        4: { ...DEFAULT_LEVEL_CONFIG.levels[4], ...(cfg.levels[4] || cfg.levels['4'] || {}) },
+                        5: { ...DEFAULT_LEVEL_CONFIG.levels[5], ...(cfg.levels[5] || cfg.levels['5'] || {}), alwaysUnlocked: true }
                     }
                 };
                 renderLevelButtons();
@@ -1176,32 +1221,43 @@
             }
 
             function renderLevelButtons() {
-                ['practice', 'reflex', 'survival', 'test'].forEach((m) => {
+                ['practice', 'reflex', 'survival', 'test', 'master'].forEach((m) => {
                     const lvl = MODE_TO_LEVEL[m];
                     const cfg = state.levelConfig.levels[lvl] || DEFAULT_LEVEL_CONFIG.levels[lvl];
                     const isActive = m === state.mode;
-                    const isLocked = state.levelConfig.lockProgression && lvl > state.currentLevel;
-                    const isPassed = Boolean(state.levelProgress[lvl]?.passed) || (lvl < state.currentLevel) || (lvl === 4 && state.completed);
-                    const prefix = isPassed ? '✅ ' : (isLocked ? '🔒 ' : '');
+                    const isFreeBonus = Boolean(cfg.alwaysUnlocked || lvl === 5);
+                    const isLocked = !isFreeBonus && state.levelConfig.lockProgression && lvl > state.currentLevel;
+                    const isPassed = isFreeBonus
+                        ? Boolean(state.levelProgress[lvl]?.passed)
+                        : (Boolean(state.levelProgress[lvl]?.passed) || (lvl < state.currentLevel) || (lvl === 4 && state.completed));
+                    const prefix = isPassed ? '✅ ' : (isLocked ? '🔒 ' : (isFreeBonus ? '🔥 ' : ''));
 
                     const btn = document.getElementById(`btn-mode-${m}`);
                     if (btn) {
                         btn.textContent = `${prefix}${cfg.shortName} (${cfg.timeLimitSec}s)`;
                         btn.className = isActive
-                            ? 'mode-btn px-2.5 py-1.5 rounded-lg font-bold transition-all bg-amber-500 text-slate-950'
+                            ? (isFreeBonus
+                                ? 'mode-btn px-2.5 py-1.5 rounded-lg font-bold transition-all bg-rose-500 text-white'
+                                : 'mode-btn px-2.5 py-1.5 rounded-lg font-bold transition-all bg-amber-500 text-slate-950')
                             : isLocked
                                 ? 'mode-btn px-2.5 py-1.5 rounded-lg font-medium transition-all text-slate-600 cursor-not-allowed'
-                                : 'mode-btn px-2.5 py-1.5 rounded-lg font-medium transition-all text-slate-300 hover:text-white';
+                                : (isFreeBonus
+                                    ? 'mode-btn px-2.5 py-1.5 rounded-lg font-semibold transition-all text-rose-300 hover:text-white'
+                                    : 'mode-btn px-2.5 py-1.5 rounded-lg font-medium transition-all text-slate-300 hover:text-white');
                     }
 
                     const mBtn = document.getElementById(`btn-mode-mobile-${m}`);
                     if (mBtn) {
                         mBtn.textContent = `${prefix}${cfg.mobileName}`;
                         mBtn.className = isActive
-                            ? 'py-1.5 px-1 rounded-lg font-bold text-center truncate transition-all bg-amber-500 text-slate-950'
+                            ? (isFreeBonus
+                                ? 'py-1.5 px-1 rounded-lg font-bold text-center truncate transition-all bg-rose-500 text-white'
+                                : 'py-1.5 px-1 rounded-lg font-bold text-center truncate transition-all bg-amber-500 text-slate-950')
                             : isLocked
                                 ? 'py-1.5 px-1 rounded-lg font-medium text-center truncate transition-all text-slate-600'
-                                : 'py-1.5 px-1 rounded-lg font-medium text-center truncate transition-all text-slate-300';
+                                : (isFreeBonus
+                                    ? 'py-1.5 px-1 rounded-lg font-semibold text-center truncate transition-all text-rose-300'
+                                    : 'py-1.5 px-1 rounded-lg font-medium text-center truncate transition-all text-slate-300');
                     }
                 });
             }
@@ -1215,6 +1271,13 @@
                 }
                 dom.levelProgressWrap.classList.remove('hidden');
                 const prog = state.levelProgress[lvl] || { solved: 0, accuracyPct: 100, passed: false };
+                if (lvl === 5) {
+                    const avgText = prog.avgSec > 0 ? ` • TB ${prog.avgSec}s` : '';
+                    dom.levelProgressLabel.textContent = `🔥 Luyện tự do ${cfg.shortName}: đã giải ${prog.solved} mã (Không khóa)`;
+                    dom.levelProgressMeta.textContent = `Acc ${prog.accuracyPct}%${avgText} • Nhiều gạch nhiễu • ${formatMinDiffLabel(cfg.minDifficulty)}`;
+                    dom.levelProgressBar.style.width = '100%';
+                    return;
+                }
                 const pct = Math.min(100, Math.round((prog.solved / Math.max(1, cfg.requiredSolved)) * 100));
                 const doneBadge = prog.passed || lvl < state.currentLevel ? ' • ✅ Đã qua màn' : '';
                 dom.levelProgressLabel.textContent = `Tiến độ ${cfg.shortName}: ${prog.solved}/${cfg.requiredSolved} mã${doneBadge}`;
@@ -1439,12 +1502,14 @@
                 if (mode === 'practice') return 'Tập phím';
                 if (mode === 'survival') return 'Sinh tồn';
                 if (mode === 'test') return 'Thi Test';
+                if (mode === 'master') return 'Lv.5 Siêu khó';
                 return 'Phản xạ';
             }
 
             function formatDiffLabel(diff) {
                 if (diff === 'easy') return 'Dễ';
                 if (diff === 'hard') return 'Ác mộng';
+                if (diff === 'extreme') return 'Địa ngục';
                 return 'In-Game';
             }
 
@@ -1644,15 +1709,16 @@
                     return;
                 }
                 const cfg = state.levelConfig;
-                const rows = [1, 2, 3, 4].map((lvl) => {
+                const rows = [1, 2, 3, 4, 5].map((lvl) => {
                     const c = cfg.levels[lvl];
-                    const reqLabel = lvl === 4 ? 'Số câu thi' : 'Số mã qua màn';
+                    const reqLabel = lvl === 4 ? 'Số câu thi' : (lvl === 5 ? 'Mốc luyện' : 'Số mã qua màn');
                     const md = c.minDifficulty || 'easy';
+                    const freeNote = lvl === 5 ? ' • Không khóa' : '';
                     return `
-                        <div class="bg-slate-950/80 border border-slate-800 rounded-xl p-3 grid grid-cols-2 sm:grid-cols-5 gap-2 items-center">
+                        <div class="bg-slate-950/80 border ${lvl === 5 ? 'border-rose-500/35' : 'border-slate-800'} rounded-xl p-3 grid grid-cols-2 sm:grid-cols-5 gap-2 items-center">
                             <div class="col-span-2 sm:col-span-1">
-                                <div class="text-xs font-extrabold text-white">${escapeHtml(c.shortName)}</div>
-                                <div class="text-[10px] text-slate-400">${c.charLength} ký tự • ${c.allowHints ? 'Có gợi ý' : 'Tắt gợi ý'}</div>
+                                <div class="text-xs font-extrabold ${lvl === 5 ? 'text-rose-300' : 'text-white'}">${escapeHtml(c.shortName)}</div>
+                                <div class="text-[10px] text-slate-400">${c.charLength} ký tự • ${c.allowHints ? 'Có gợi ý' : 'Tắt gợi ý'}${freeNote}</div>
                             </div>
                             <label class="text-[11px] text-slate-300 flex flex-col gap-1">
                                 <span>Giây / mã</span>
@@ -1671,7 +1737,8 @@
                                 <select id="cfg-diff-${lvl}" class="bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-xs font-bold text-rose-300 focus:outline-none focus:border-amber-500">
                                     <option value="easy" ${md === 'easy' ? 'selected' : ''}>Dễ trở lên</option>
                                     <option value="medium" ${md === 'medium' ? 'selected' : ''}>Chuẩn In-Game+</option>
-                                    <option value="hard" ${md === 'hard' ? 'selected' : ''}>Bắt buộc Ác Mộng</option>
+                                    <option value="hard" ${md === 'hard' ? 'selected' : ''}>Ác Mộng trở lên</option>
+                                    <option value="extreme" ${md === 'extreme' ? 'selected' : ''}>Bắt buộc Địa Ngục</option>
                                 </select>
                             </label>
                         </div>
@@ -1714,7 +1781,7 @@
                     lockProgression: Boolean(document.getElementById('cfg-lock-progression')?.checked),
                     levels: {}
                 };
-                for (const lvl of [1, 2, 3, 4]) {
+                for (const lvl of [1, 2, 3, 4, 5]) {
                     nextCfg.levels[lvl] = {
                         ...state.levelConfig.levels[lvl],
                         timeLimitSec: Number(document.getElementById(`cfg-sec-${lvl}`)?.value || state.levelConfig.levels[lvl].timeLimitSec),
@@ -1944,7 +2011,7 @@
                     `).join('');
 
                 const levelBarsHtml = pd.levelProgress
-                    ? `<div class="grid grid-cols-2 sm:grid-cols-4 gap-1.5 mt-1">` + [1, 2, 3, 4].map((lvl) => {
+                    ? `<div class="grid grid-cols-2 sm:grid-cols-5 gap-1.5 mt-1">` + [1, 2, 3, 4, 5].map((lvl) => {
                         const lp = pd.levelProgress[lvl] || { solved: 0, accuracyPct: 100, avgSec: 0, passed: false };
                         return `
                             <div class="bg-slate-900/90 border ${lp.passed ? 'border-emerald-500/40' : 'border-slate-800'} rounded-lg px-2 py-1.5 text-center">
@@ -2306,8 +2373,8 @@
                     return CONFIG.TRICKY_SINGLE[Math.floor(Math.random() * CONFIG.TRICKY_SINGLE.length)];
                 }
 
-                // Ở Lv.2 (3 chữ) & Lv.3 (6 chữ): trộn 40% xác suất chèn 1–2 chữ hay sai của cá nhân để trị dứt điểm điểm yếu
-                const topWeak = (state.mode === 'reflex' || state.mode === 'survival')
+                // Ở Lv.2 (3 chữ), Lv.3 (6 chữ) & Lv.5 (Luyện+): trộn 40% xác suất chèn 1–2 chữ hay sai của cá nhân để trị dứt điểm điểm yếu
+                const topWeak = (state.mode === 'reflex' || state.mode === 'survival' || state.mode === 'master')
                     ? getTopWeakChars(state.weakChars, 8).map((w) => w.ch)
                     : [];
                 const injectWeakInto = (str) => {
@@ -2379,7 +2446,7 @@
             }
 
             function updateHints() {
-                const showHints = dom.toggleHints.checked && state.mode !== 'survival' && state.mode !== 'test';
+                const showHints = dom.toggleHints.checked && state.mode !== 'survival' && state.mode !== 'test' && state.mode !== 'master';
                 const typedJamos = HangulEngine.decomposeString(dom.input.value.trim());
 
                 let matchLen = 0;
@@ -2599,7 +2666,9 @@
 
             function setMode(mode) {
                 const targetLvl = MODE_TO_LEVEL[mode] || 1;
-                if (state.levelConfig.lockProgression && targetLvl > state.currentLevel) {
+                const targetCfg = state.levelConfig.levels[targetLvl] || DEFAULT_LEVEL_CONFIG.levels[targetLvl];
+                const isFreeBonusTarget = Boolean(targetCfg?.alwaysUnlocked || targetLvl === 5);
+                if (!isFreeBonusTarget && state.levelConfig.lockProgression && targetLvl > state.currentLevel) {
                     const prevCfg = state.levelConfig.levels[targetLvl - 1];
                     SoundFX.wrong();
                     showOverlay(
@@ -2636,8 +2705,8 @@
                 if ((DIFF_RANK[dom.difficulty.value] || 1) < minRank || isTest) {
                     dom.difficulty.value = minDiff;
                 }
-                dom.difficulty.disabled = isTest || minDiff === 'hard';
-                dom.difficulty.classList.toggle('opacity-50', isTest || minDiff === 'hard');
+                dom.difficulty.disabled = isTest || minDiff === 'extreme';
+                dom.difficulty.classList.toggle('opacity-50', isTest || minDiff === 'extreme');
 
                 dom.toggleHints.disabled = !cfg.allowHints;
                 if (!cfg.allowHints) {

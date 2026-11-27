@@ -480,3 +480,62 @@ test('Already-unlocked Lv.2 player who later fails on Lv.1 can still advance to 
     delete process.env.LOCAL_DB_URL;
     resetDbClientForTest();
 });
+
+test('Level 5 bonus extreme practice is never locked and does not alter Lv.1->4 progression', async () => {
+    process.env.LOCAL_DB_URL = ':memory:';
+    delete process.env.TURSO_DATABASE_URL;
+    delete process.env.ADMIN_PIN;
+    resetDbClientForTest();
+
+    // Admin updates Lv.5 timer & difficulty config while keeping lockProgression=true
+    const setRes = createMockRes();
+    await adminHandler({
+        method: 'PATCH',
+        body: {
+            action: 'update-settings',
+            levelConfig: {
+                lockProgression: true,
+                levels: {
+                    5: { timeLimitSec: 12, requiredSolved: 5, minAccuracyPct: 90, minDifficulty: 'extreme' }
+                }
+            }
+        },
+        headers: {}
+    }, setRes);
+    assert.equal(setRes.result.statusCode, 200);
+    assert.equal(setRes.result.body.levelConfig.levels[5].timeLimitSec, 12);
+    assert.equal(setRes.result.body.levelConfig.levels[5].minDifficulty, 'extreme');
+    assert.equal(setRes.result.body.levelConfig.levels[5].alwaysUnlocked, true);
+
+    // Brand new Lv.1 player submits Lv.5 ('master') attempt -> allowed even with lockProgression=true!
+    const reg = createMockRes();
+    await playerHandler({ method: 'POST', body: { action: 'login', name: 'MasterTester', pin: '4444' }, headers: {} }, reg);
+    const uid = reg.result.body.profile.userId;
+
+    const lv5Res = createMockRes();
+    await attemptHandler({
+        method: 'POST',
+        body: { userId: uid, name: 'MasterTester', mode: 'master', difficulty: 'extreme', target: '히든스트리트', typedInput: '히든스트리트', isCorrect: true, elapsedMs: 6500 },
+        headers: {}
+    }, lv5Res);
+    assert.equal(lv5Res.result.statusCode, 200);
+    assert.equal(lv5Res.result.body.ok, true);
+    assert.equal(lv5Res.result.body.levelProgress[5].solved, 1);
+    assert.equal(lv5Res.result.body.levelProgress[5].alwaysUnlocked, true);
+    // Still at Lv.1 in sequential path and not falsely marked completed
+    assert.equal(lv5Res.result.body.currentLevel, 1);
+    assert.equal(lv5Res.result.body.completed, false);
+
+    // Meanwhile Lv.2 ('reflex') is still locked for that same Lv.1 player
+    const lv2Locked = createMockRes();
+    await attemptHandler({
+        method: 'POST',
+        body: { userId: uid, name: 'MasterTester', mode: 'reflex', difficulty: 'medium', target: '강모도', typedInput: '강모도', isCorrect: true, elapsedMs: 3000 },
+        headers: {}
+    }, lv2Locked);
+    assert.equal(lv2Locked.result.statusCode, 403);
+    assert.equal(lv2Locked.result.body.code, 'LEVEL_LOCKED');
+
+    delete process.env.LOCAL_DB_URL;
+    resetDbClientForTest();
+});

@@ -31,7 +31,9 @@ export default async function handler(req, res) {
         const lvlNum = MODE_TO_LEVEL[mode] || 1;
 
         // Chặn phía server nếu Level đang bị khóa (tránh tab cũ chưa F5 gửi nhầm bài lên Level cao hơn)
-        if (levelConfig.lockProgression && lvlNum > 1) {
+        // Riêng Level 5 (luyện tập siêu khó) luôn được miễn khóa để mọi người đều có thể vào luyện
+        const targetLvlCfg = levelConfig.levels[lvlNum];
+        if (levelConfig.lockProgression && lvlNum > 1 && !targetLvlCfg?.alwaysUnlocked) {
             const curRes = await db.execute({ sql: 'SELECT current_level FROM players WHERE id = ?', args: [playerId] });
             let allowedLevel = curRes.rows.length > 0 ? Number(curRes.rows[0].current_level || 1) : 1;
             if (lvlNum > allowedLevel && curRes.rows.length > 0) {
